@@ -34,6 +34,11 @@ int CreateServerSocket(std::string ip, int port, int socket_flags,
 
 int CreateClientSocket(std::string ip,int port,int socket_flags);                       
 
-// int CreateClientConnectSocket(std::string ip, int port, int socket_flag);
+int SetSocketNonBlocking(int fd);
+
+void SetSocketNodelay(int fd);
+
+void SetSocketNoLinger(int fd);
+
 
 #endif // DEMO_SOCKET_H

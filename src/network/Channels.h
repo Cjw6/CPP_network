@@ -6,47 +6,51 @@
 #define SERVERPROJECT_CHANNELS_H
 
 #include "Dispatcher.h"
-#include <functional>
+#include <atomic>
 #include <cstdint>
+#include <functional>
+#include <string>
+#include <sys/epoll.h>
 
-class Channels
-{
-  public:
-    enum EventOption
-    {
-        kEventAdd = 0,
-        kEventMod,
-        kEventDel
-    };
+class Channels {
+  friend class Dispatcher;
 
-    explicit Channels(Dispatcher::Ptr&loop,int fd);
-    ~Channels();
+public:
+  enum EventOption {
+    kEventAdd = EPOLL_CTL_ADD,
+    kEventMod = EPOLL_CTL_MOD,
+    kEventDel = EPOLL_CTL_DEL
+  };
 
-    virtual int HandleRead(){return 0;};
-    virtual int HandleWrite(){return 0;};
-    virtual int HandleError(){return 0;};
+  explicit Channels(Dispatcher::Ptr &loop, int fd);
+  virtual ~Channels();
 
-    void HandleEvents(uint32_t events);
-    void UpdateEventOption(EventOption event_option, uint32_t event_state);
+  // virtual std::string &GetType();
+  // virtual int HandleRead();
+  // virtual int HandleWrite();
+  // virtual int HandleError();
 
-    void EnableRead();
-    void DisableRead();
-    void EnableWrite();
-    void DisableWrite();
+  void SetEvents(uint32_t events);
+  virtual void HandleEvents()=0;
 
-    
-    EventOption GetEventOption() { return event_option_; }
-    uint32_t GetEvents() { return events_; }
+  void UpdateEventOption(EventOption event_option, uint32_t event_state);
 
-    // void SetFd(int fd){fd_=fd;}
-    int GetFd(){return fd_;}
-    
-    Dispatcher::Ptr disp_;
-  
-  private:
-    int fd_;
-    EventOption event_option_;
-    uint32_t events_;
+  void EnableRead();
+  void DisableRead();
+  void EnableWrite();
+  void DisableWrite();
+
+  EventOption GetEventOption() { return event_option_; }
+  uint32_t GetEvents() { return events_; }
+  int GetFd() { return fd_; }
+
+protected:
+  int fd_;
+  EventOption event_option_;
+  uint32_t events_;
+  Dispatcher::Ptr disp_;
 };
 
-#endif  // SERVERPROJECT_CHANNELS_H
+// void HandleEvents(Channels* p);
+
+#endif // SERVERPROJECT_CHANNELS_H

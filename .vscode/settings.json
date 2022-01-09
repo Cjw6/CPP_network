@@ -1,7 +1,6 @@
 {
   "C_Cpp.default.cppStandard": "c++17",
   "cmake.configureArgs": [
-    "-DOpenCV_DIR=/media/cjw/work/ubuntu_lib/opencv/build",
     "-DWITH_ASAN=ON"
   ],
   "clangd.arguments": [
@@ -12,7 +11,7 @@
     // https://zhuanlan.zhihu.com/p/84876003
     // "--include-dir=/usr/lib/gcc/x86_64-linux-gnu/9/include",
     "--query-driver=/usr/bin/g++-10",
-    "--compile-commands-dir=linux_debug_build",
+    "--compile-commands-dir=build",
     // 同时开启的任务数量
     "-j=6",
     // 告诉clangd用那个clang进行编译，路径参考which clang++的路径
@@ -29,4 +28,5 @@
     // pch优化的位置
     "--pch-storage=disk",
   ],
+  "C_Cpp.intelliSenseEngine":"Disabled"
 }

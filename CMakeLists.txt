@@ -6,7 +6,7 @@ option(WITH_ASAN "" ON)
 
 if(WITH_ASAN)
 message("using Address Sanitizer")
-set(CMAKE_CXX_FLAGS_DEBUG "-fsanitize=address -fno-omit-frame-pointer ")
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
 endif()
 
 add_subdirectory(src)

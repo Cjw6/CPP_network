@@ -1,11 +1,13 @@
 #include "TcpServer.h"
+#include "Acceptor.h"
+#include "Buffer.h"
+#include "Channels.h"
 #include "Socket.h"
 #include "TcpConnect.h"
-#include "network/Acceptor.h"
-#include "network/Channels.h"
 
 #include <glog/logging.h>
 #include <memory>
+#include <mutex>
 #include <resolv.h>
 #include <string>
 #include <unistd.h>
@@ -35,10 +37,11 @@ void TcpServer::InitServer(Config &conf, Dispatcher::Ptr &disp) {
       TcpConnect::Ptr tcp_conn = std::make_shared<TcpConnect>(
           this, dispatcher_, ip, port, fd, conn_name);
 
-      tcp_conn->SetReadCb([&](TcpConnect::Ptr p,char *buffer, int len) -> int {
+      tcp_conn->SetReadCb([&](TcpConnect::Ptr p, BufferReader &reader,
+                              BufferWriter &writer) -> int {
         LOG(INFO) << "tcp server read cb";
         DCHECK(read_cb_) << "read_cb_ is null";
-        return read_cb_(p,buffer, len);
+        return read_cb_(p, reader, writer);
       });
 
       tcp_conn->SetErrorCb([&](TcpConnect::Ptr p) {
@@ -47,9 +50,17 @@ void TcpServer::InitServer(Config &conf, Dispatcher::Ptr &disp) {
         error_cb_(p);
       });
 
-      conn_map_.emplace(conn_name, tcp_conn);
+      conn_mgr_.AddConnectToManager(tcp_conn->GetName(),tcp_conn);
+      // conn_mgr_.conn_map_.emplace(tcp_conn.get(), tcp_conn);
     });
   }
 }
 
-void TcpServer::RemoveSocketByName(std::string name) { conn_map_.erase(name); }
+void TcpServer::RemoveSocketByName(const std::string &name) {
+  conn_mgr_.RemoveConnectToManager(name);
+  // std::lock_guard<std::mutex> lg(conn_map_mutex_);
+  // auto iter = conn_mgr_.conn_map_.find(p);
+  // if (iter != conn_mgr_.conn_map_.end()) {
+  //   conn_mgr_.conn_map_.erase(p);
+  // }
+}

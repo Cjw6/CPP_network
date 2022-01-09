@@ -4,7 +4,9 @@
 #include "TcpConnect.h"
 #include "network/Acceptor.h"
 #include "network/Channels.h"
+#include "network/ConnectManager.h"
 #include <map>
+#include <mutex>
 #include <string>
 
 class Acceptor;
@@ -21,7 +23,7 @@ public:
   ~TcpServer();
 
   void InitServer(Config &conf, Dispatcher::Ptr &disp);
-  void RemoveSocketByName(std::string name);
+  void RemoveSocketByName(const std::string &name);
 
   void SetNewConnCb(AcceptNewConnectCallback cb);
   void SetReadCb(TcpConnect::ReadCb cb);
@@ -36,7 +38,9 @@ private:
   TcpConnect::ReadCb  read_cb_;
   TcpConnect::ErrorCb  error_cb_;
 
-  std::map<std::string, std::shared_ptr<TcpConnect>> conn_map_;
+  ConnectManager conn_mgr_;
+  
   int conn_gen_id_;
+
   
 };

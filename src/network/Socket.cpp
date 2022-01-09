@@ -3,7 +3,9 @@
 //
 
 #include "Socket.h"
+#include <fcntl.h>
 #include <glog/logging.h>
+#include <unistd.h>
 
 int CreateSocket(std::string &host, int port, int socket_flags, int listen_num,
                  SocketOptions socket_options, BindOrConnect bind_or_connect) {
@@ -84,7 +86,7 @@ bool BindListenSocket(int sock, void *data, int listen_num) {
 
 bool ConnectSocket(int sock, void *data, int listen_num) {
   addrinfo *ai = reinterpret_cast<addrinfo *>(data);
-  if (connect(sock, ai->ai_addr,static_cast<socklen_t>(ai->ai_addrlen)) < 0) {
+  if (connect(sock, ai->ai_addr, static_cast<socklen_t>(ai->ai_addrlen)) < 0) {
     LOG(ERROR) << "connect error: " << strerror(errno) << " errno: " << errno;
     return false;
   }
@@ -131,8 +133,32 @@ int CreateClientSocket(std::string ip, int port, int socket_flags) {
 //   }
 
 //   if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
-//     LOG(ERROR) << "connect error: " << strerror(errno) << " errno: " << errno;
-//     return -3;
+//     LOG(ERROR) << "connect error: " << strerror(errno) << " errno: " <<
+//     errno; return -3;
 //   }
 //   return sockfd;
 // }
+
+int SetSocketNonBlocking(int fd) {
+  int flag = fcntl(fd, F_GETFL, 0);
+  if (flag == -1)
+    return -1;
+
+  flag |= O_NONBLOCK;
+  if (fcntl(fd, F_SETFL, flag) == -1)
+    return -1;
+  return 0;
+}
+
+void SetSocketNodelay(int fd) {
+  int enable = 1;
+  setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&enable, sizeof(enable));
+}
+
+void SetSocketNoLinger(int fd) {
+  struct linger linger_;
+  linger_.l_onoff = 1;
+  linger_.l_linger = 30;
+  setsockopt(fd, SOL_SOCKET, SO_LINGER, (const char *)&linger_,
+             sizeof(linger_));
+}

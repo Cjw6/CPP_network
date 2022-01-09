@@ -1,14 +1,18 @@
 //
 // Created by cjw on 21-4-1.
 //
-
 #include "Channels.h"
 #include "Dispatcher.h"
-#include <sys/epoll.h>
+#include "TcpServer.h"
+#include <atomic>
+#include <glog/logging.h>
 
-Channels::Channels(Dispatcher::Ptr& loop,int fd) : disp_(loop),fd_(fd) ,events_(0) {}
+Channels::Channels(Dispatcher::Ptr &loop, int fd)
+    : disp_(loop), fd_(fd), events_(0) {}
 
 Channels::~Channels() {}
+
+// std::string &Channels::GetType() { return class_name; }
 
 void Channels::UpdateEventOption(Channels::EventOption event_option,
                                  uint32_t event_state) {
@@ -17,37 +21,21 @@ void Channels::UpdateEventOption(Channels::EventOption event_option,
   disp_->UpdateChannels(this);
 }
 
-void Channels::HandleEvents(uint32_t events) {
-  events_ = events;
-  if (events_ & EPOLLIN) {
-    if(HandleRead()<0){
-      HandleError();
-    }
-  } else if (events_ & EPOLLOUT) {
-    if(HandleWrite()<0){
-      HandleError();
-    }
-  } else if (events_ & EPOLLERR) {
-    HandleError();
-  }
-}
+void Channels::SetEvents(uint32_t events) { events_ = events; }
 
 void Channels::EnableRead() {
   events_ |= EPOLLIN;
-  UpdateEventOption(Channels::kEventAdd, events_);
+  UpdateEventOption(kEventMod, events_);
 }
 
 void Channels::DisableRead() {
   events_ &= ~EPOLLIN;
-  UpdateEventOption(Channels::kEventAdd, events_);
+  UpdateEventOption(kEventMod, events_);
 }
 
 void Channels::EnableWrite() {
   events_ |= EPOLLOUT;
-  UpdateEventOption(Channels::kEventAdd, events_);
+  UpdateEventOption(kEventMod, events_);
 }
 
-void Channels::DisableWrite() {
-  events_ &= ~EPOLLOUT;
-  UpdateEventOption(Channels::kEventAdd, events_);
-}
+
