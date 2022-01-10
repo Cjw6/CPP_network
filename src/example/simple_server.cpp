@@ -26,10 +26,9 @@ ClientManager g_cli_mgr;
 
 int MessageHandler(TcpConnect::Ptr tcp_comm, BufferReader &reader,
                    BufferWriter &writer) {
-  // char *pmsg = reader.beginRead();
-  // int size = reader.readableBytes();
-  // writer.Append(pmsg, size);
-  // reader.retrieveAll();
+  for (int i = 0; i < 10; i++)
+    writer.Append(reader.ReadBegin(), reader.ReadavbleSize());
+  reader.RetrieveAll();
   return 1;
 }
 
@@ -62,11 +61,12 @@ int HugeRecvMessageHandler(TcpConnect::Ptr tcp_comm, BufferReader &reader,
   return 1;
 }
 
-int main(int argc,char** argv) {
+int main(int argc, char **argv) {
   InitGlog(argv[0], log_dir.c_str());
   signal(SIGPIPE, SIG_IGN);
 
   Dispatcher::Config dispatcher_conf;
+  dispatcher_conf.thread_num = 4;
   Dispatcher::Ptr disp = std::make_shared<Dispatcher>();
   disp->InitLoop(dispatcher_conf);
 
@@ -75,16 +75,17 @@ int main(int argc,char** argv) {
     LOG(INFO) << "new conn" << fd << " " << ip << " " << port;
     LOG(INFO) << "accept cnt:" << ++g_cli_mgr.accep_cnt;
   });
-  // serv.SetReadCb(MessageHandler);
+  serv.SetReadCb(MessageHandler);
   // serv.SetReadCb(HugeSendMessageHandler);
-  serv.SetReadCb(HugeRecvMessageHandler);
+  // serv.SetReadCb(HugeRecvMessageHandler);
   serv.SetErrorCb(
       [](TcpConnect::Ptr p) { LOG(INFO) << p->GetName() << " error"; });
-  
+
   TcpServer::Config conf;
   conf.ip_ = "0.0.0.0";
   conf.port = 8888;
   conf.max_listen = 1024;
+  LOG(INFO) << "server bind ip " << conf.ip_ << "   port: " << conf.port;
   serv.InitServer(conf, disp);
 
   disp->Dispatch();

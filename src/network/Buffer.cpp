@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <errno.h>
+#include <memory>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -53,19 +54,18 @@ CBufWriter::CBufWriter() {}
 
 CBufWriter::~CBufWriter() {}
 
+void CBufWriter::Append(const char *pdata, int len) {
+  m_buf.emplace_back(std::make_shared<BufFixedBlock>(pdata, len));
+}
+
 void CBufWriter::Append(BufFixedBlkPtr &pBuf) { m_buf.push_back(pBuf); }
 
-// BufFixedBlock::BufFixedBlock(int nLen) {
-//   // LOG_DEBUG("new blk %d \n", nLen);
-//   m_nLen = nLen;
-//   m_pBuf = new char[m_nLen];
-// }
-
 BufFixedBlock::BufFixedBlock(const char *data, int len)
-    : m_pBuf(nullptr), m_nLen(0) {
+    : m_pBuf(nullptr), m_nLen(0),m_index(0) {
   assert(data);
   assert(len > 0);
   m_pBuf = new char[len];
+  m_nLen = len;
   memcpy(m_pBuf, data, m_nLen);
 }
 

@@ -29,10 +29,9 @@ public:
   virtual ~TcpConnect();
 
   void HandleEvents() override;
-
-  void SetReadCb(ReadCb cb) { read_cb_ = cb; }
+  void SetReadCb(ReadCb cb) { read_cb_ = std::move(cb); }
   // void SetWriteCb(WriteCb cb) { write_cb_ = cb; }
-  void SetErrorCb(ErrorCb cb) { error_cb_ = cb; }
+  void SetErrorCb(ErrorCb cb) { error_cb_ = std::move(cb); }
   int Send(int n);
 
   const std::string &GetName() { return name_; }

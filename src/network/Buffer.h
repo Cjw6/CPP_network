@@ -62,6 +62,7 @@ class CBufWriter
 public:
 	CBufWriter();
 	~CBufWriter();
+  void Append(const char* pdata,int len);
 	void Append(BufFixedBlkPtr &pBuf);
 	int Send(int sockfd);
 	int QueueSize();

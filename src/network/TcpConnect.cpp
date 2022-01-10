@@ -1,7 +1,8 @@
 #include "TcpConnect.h"
+#include "Buffer.h"
 #include "Channels.h"
 #include "TcpServer.h"
-#include "Buffer.h"
+#include <asm-generic/errno-base.h>
 #include <cstring>
 #include <errno.h>
 #include <fcntl.h>
@@ -28,14 +29,14 @@ TcpConnect::~TcpConnect() {
 void TcpConnect::HandleEvents() {
   disp_->ExecTask([this] {
     if (events_ & (EPOLLIN | EPOLLPRI | EPOLLRDHUP)) {
-      if (HandleRead() < 0) {
+      if (HandleRead() <= 0) {
         HandleError();
         return;
       }
     }
 
     if (events_ & EPOLLOUT) {
-      if (HandleWrite() < 0) {
+      if (HandleWrite() <= 0) {
         HandleError();
         return;
       }
@@ -49,52 +50,54 @@ void TcpConnect::HandleEvents() {
 }
 
 int TcpConnect::HandleRead() {
+  do {
+    char buf[1024] = {0};
+    int n = read(fd_, buf, 1024);
+    if (n > 0) {
+      buffer_reader_.Append(buf, n);
+    } else if (n < 0) {
+      if (errno == EAGAIN || errno == EINTR) {
+        break;
+      } else {
+        return -1;
+      }
+    } else {
+      LOG(WARNING) << "disconnect ";
+      return 0;
+    }
+  } while (1);
 
-  // int read_errno = 0;
-  // int n = buffer_reader_.readFd(fd_, &read_errno);
+  CHECK(read_cb_) << "read_cb is null";
+  read_cb_(shared_from_this(), buffer_reader_, buffer_writer_);
 
-  // if (n < 0) {
-  //   if (read_errno == EAGAIN || read_errno == EINTR) {
-  //     return 1;
-  //   }
-  //   return -1;
-  // } else if (n == 0) {
-  //   LOG(INFO) << "disconnect ..." << name_;
-  //   return -1;
-  // }
+  if (buffer_writer_.QueueSize()) {
+    if (buffer_writer_.Send(fd_) < 0) {
+      return -1;
+    }
+  }
 
-  // if (read_cb_)
-  //   read_cb_(shared_from_this(), buffer_reader_, buffer_writer_);
-
-  // buffer_writer_.Send(fd_);
-
-  // LOG(INFO) << "buffer write item size" << buffer_writer_.ItemSize();
-  // if (buffer_writer_.ItemSize() > 0) {
-  //   LOG(INFO) << "enable write ...";
-  //   UpdateEventOption(kEventMod,
-  //                     EPOLLIN | EPOLLOUT | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
-  // } else {
-  //   UpdateEventOption(kEventMod, EPOLLIN | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
-  // }
+  if (buffer_writer_.QueueSize() > 0) {
+    UpdateEventOption(kEventMod,
+                      EPOLLIN | EPOLLOUT | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
+  } else {
+    UpdateEventOption(kEventMod, EPOLLIN | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
+  }
 
   return 1;
 }
 
 int TcpConnect::HandleWrite() {
-  // // TODO:too much  data to send ...
-  // LOG(INFO) << "tcp conn handle write ";
-  // int ret = buffer_writer_.Send(fd_);
-  // if (ret < 0) {
-  //   return -1;
-  // }
+  if (buffer_writer_.Send(fd_) < 0) {
+    return -1;
+  }
 
-  // LOG(INFO) << "wait send " << buffer_writer_.ItemSize();
-  // if (buffer_writer_.ItemSize() > 0) {
-  //   UpdateEventOption(kEventMod,
-  //                     EPOLLIN | EPOLLOUT | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
-  // } else {
-  //   UpdateEventOption(kEventMod, EPOLLIN | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
-  // }
+  if (buffer_writer_.QueueSize() > 0) {
+    UpdateEventOption(kEventMod,
+                      EPOLLIN | EPOLLOUT | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
+  } else {
+    UpdateEventOption(kEventMod, EPOLLIN | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
+  }
+
   return 1;
 }
 

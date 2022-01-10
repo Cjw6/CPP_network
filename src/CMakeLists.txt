@@ -31,14 +31,12 @@ network/ConnectManager.cpp
 network/ConnectManager.h
 network/Dispatcher.cpp
 network/Dispatcher.h
-network/epoll.c
 network/Socket.cpp
 network/Socket.h
 network/TcpConnect.cpp
 network/TcpConnect.h
 network/TcpServer.cpp
 network/TcpServer.h
-protocol
 protocol/adler32.cpp
 protocol/adler32.h
 protocol/EncodeInt.cpp
@@ -54,7 +52,6 @@ protocol/MsgFixedBlock.cpp
 protocol/MsgFixedBlock.h
 protocol/MsgParse.cpp
 protocol/MsgParse.h
-util
 util/Env.h
 util/FastRand.cpp
 util/FastRand.h
