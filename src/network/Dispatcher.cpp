@@ -1,5 +1,6 @@
 #include "Dispatcher.h"
-#include "network/Channels.h"
+
+#include "Channels.h"
 #include "util/Thread.h"
 #include "util/ThreadPool.h"
 #include <functional>
@@ -110,15 +111,16 @@ void Dispatcher::ModifyEvent(int fd, int state) {
   epoll_ctl(epoll_fd_, EPOLL_CTL_MOD, fd, &ev);
 }
 
-void Dispatcher::UpdateChannels(Channels *pc) {
+void Dispatcher::UpdateChannels(Channels *pc, int fd, uint32_t option,
+                                uint32_t events) {
 
   DCHECK_NOTNULL(pc);
 
   epoll_event ev = {0};
   ev.data.ptr = pc;
-  ev.events = pc->GetEvents();
+  ev.events = events;
 
-  epoll_ctl(epoll_fd_, pc->GetEventOption(), pc->GetFd(), &ev);
+  epoll_ctl(epoll_fd_, option, fd, &ev);
 }
 
 void Dispatcher::ChannelHandelEvent(int n) {

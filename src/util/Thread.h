@@ -2,14 +2,33 @@
 // Created by cjw on 21-3-31.
 //
 
-#ifndef SERVERPROJECT_UTILTHREAD_H
-#define SERVERPROJECT_UTILTHREAD_H
+#pragma once
 
-#include <pthread.h>
-// #include <time.h>
-// #include <functional>
-// #include <string>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 pid_t GetThreadId();
 
-#endif  // SERVERPROJECT_UTILTHREAD_H
+class Thread {
+public:
+  Thread();
+  virtual ~Thread();
+  void Start(std::string name = "", bool is_detach = false);
+
+protected:
+  virtual void PreRun();
+  virtual void Run();
+  virtual void AfterRun();
+
+private:
+  // void RunInternal(std::string &name);
+  std::thread thread_;
+  std::mutex thread_mux_;
+  std::condition_variable wait_thread_cond_;
+  bool running_;
+  bool finished_;
+
+  static std::atomic<int> s_thread_cnt;
+};

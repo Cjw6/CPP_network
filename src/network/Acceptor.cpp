@@ -11,21 +11,22 @@
 #define ACCEPT_USE_EPOLLET 1
 
 Acceptor::Acceptor(Dispatcher::Ptr &disp, std::string ip, int port,
-                   int listen_num, int fd)
-    : Channels(disp, fd), ip_(ip), port_(port), accept_cb_(nullptr) {
-  // int fd = CreateServerSocket(ip_, port_, 0, listen_num);
-  if (fd > 0) {
-    SetSocketNonBlocking(fd_);
-
-#if ACCEPT_USE_EPOLLLT
-    UpdateEventOption(kEventAdd, EPOLLIN);
-#elif ACCEPT_USE_EPOLLET
-    UpdateEventOption(kEventAdd, EPOLLIN | EPOLLET | EPOLLONESHOT);
-#endif
-  }
-}
+                   int listen_num)
+    : Channels(disp), ip_(ip), port_(port), accept_cb_(nullptr),
+      listen_num_(listen_num), listem_fd_(-1) {}
 
 Acceptor::~Acceptor() {}
+
+int Acceptor::Listen() {
+  listem_fd_ = CreateServerSocket(ip_, port_, 0, listen_num_);
+  if (listem_fd_ < 0) {
+    LOG(ERROR) << " listen error";
+    return -1;
+  }
+  SetSocketNonBlocking(listem_fd_);
+  UpdateEventOption(listem_fd_, kEventAdd, EPOLLIN | EPOLLET | EPOLLONESHOT);
+  return 1;
+}
 
 void Acceptor::SetNewConnCb(AcceptNewConnectCallback cb) { accept_cb_ = cb; }
 
@@ -86,7 +87,7 @@ int Acceptor::HandleRead() {
       }
     }
   } while (cli_fd > 0);
-  UpdateEventOption(kEventMod, EPOLLIN | EPOLLET | EPOLLONESHOT);
+  UpdateEventOption(listem_fd_, kEventMod, EPOLLIN | EPOLLET | EPOLLONESHOT);
 #endif
 
   return 0;

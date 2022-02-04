@@ -1,127 +1,153 @@
 #include "Buffer.h"
+#include "util/SafeMem.h"
+
+#include <sys/socket.h>
+#include <sys/types.h>
 
 #include <cassert>
 #include <errno.h>
 #include <memory>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 
-CByteBuffer::CByteBuffer() : m_nReadIndex(0), m_nWriteIndex(0) {
-  // m_buf.reserve(1024);
-}
+#include <algorithm>
+#include <cstring>
 
-CByteBuffer::~CByteBuffer() {}
+#include <glog/logging.h>
 
-char *CByteBuffer::Begin() { return m_buf.data(); }
+// static const char kCRLF[] = "\r\n";
+// static const char kCRLFCRLF[] = "\r\n\r\n";
 
-char *CByteBuffer::ReadBegin() { return m_buf.data() + m_nReadIndex; }
 
-char *CByteBuffer::WriteBegin() { return m_buf.data() + m_nWriteIndex; }
 
-void CByteBuffer::Retrieve(int nLen) {
-  m_nReadIndex += nLen;
-  if (m_nReadIndex == m_nWriteIndex) {
-    m_nReadIndex = 0;
-    m_nWriteIndex = 0;
-  }
-}
+SendBufBlock::SendBufBlock()
+    : m_pBuf(nullptr), m_nLen(0), m_index(0), m_capcity(0) {}
 
-void CByteBuffer::RetrieveAll() {
-  m_nReadIndex = 0;
-  m_nWriteIndex = 0;
-}
-
-int CByteBuffer::DataLen() { return m_nWriteIndex - m_nReadIndex; }
-
-void CByteBuffer::Append(const char *data, int len) {
-  // LOG_DEBUG("ri:%d wI:%d size:%d\n", m_nReadIndex, m_nWriteIndex,
-  // m_buf.size());
-  m_buf.insert(m_buf.begin() + m_nWriteIndex, data, data + len);
-  m_nWriteIndex += len;
-}
-
-int CByteBuffer::ReadavbleSize() { return m_nWriteIndex - m_nReadIndex; }
-
-int CByteBuffer::WritableSize() { return m_buf.size() - m_nWriteIndex; }
-
-void CByteBuffer::DebugSpace() {
-  // printf("Debug space  size:%d  capcity%d\n  ri:%d  wi%d\n", m_buf.size(),
-  // m_buf.capacity(), m_nReadIndex, m_nWriteIndex);
-}
-
-CBufWriter::CBufWriter() {}
-
-CBufWriter::~CBufWriter() {}
-
-void CBufWriter::Append(const char *pdata, int len) {
-  m_buf.emplace_back(std::make_shared<BufFixedBlock>(pdata, len));
-}
-
-void CBufWriter::Append(BufFixedBlkPtr &pBuf) { m_buf.push_back(pBuf); }
-
-BufFixedBlock::BufFixedBlock(const char *data, int len)
-    : m_pBuf(nullptr), m_nLen(0),m_index(0) {
+SendBufBlock::SendBufBlock(const char *data, int len)
+    : m_pBuf(nullptr), m_nLen(0), m_index(0) {
   assert(data);
   assert(len > 0);
-  m_pBuf = new char[len];
+  m_pBuf = (char *)malloc(len);
   m_nLen = len;
   memcpy(m_pBuf, data, m_nLen);
+  m_capcity = m_nLen;
 }
 
-BufFixedBlock::~BufFixedBlock() {
-  // LOG_DEBUG("destruct .....\n");
-  if (m_pBuf) {
-    delete[] m_pBuf;
+SendBufBlock::~SendBufBlock() { SafeFree(m_pBuf); }
+
+SendBufBlock::SendBufBlock(SendBufBlock &&blk) {
+  SafeFree(this->m_pBuf);
+  this->m_pBuf = blk.m_pBuf;
+  blk.m_pBuf = nullptr;
+
+  this->m_index = blk.m_index;
+  this->m_capcity = blk.m_capcity;
+  this->m_nLen = blk.m_nLen;
+
+  blk.Clear();
+}
+
+SendBufBlock &SendBufBlock::operator=(SendBufBlock &&blk) {
+  if (&blk != this) {
+    SafeFree(this->m_pBuf);
+    this->m_pBuf = blk.m_pBuf;
+    blk.m_pBuf = nullptr;
+
+    this->m_index = blk.m_index;
+    this->m_capcity = blk.m_capcity;
+    this->m_nLen = blk.m_nLen;
+
+    blk.Clear();
   }
+  return *this;
 }
 
-int BufFixedBlock::WaitSendLen() { return m_nLen - m_index; }
+int SendBufBlock::WaitSendLen() { return m_nLen - m_index; }
 
-void BufFixedBlock::Retrieve(int len) {
+void SendBufBlock::Retrieve(int len) {
   m_index += len;
   // LOG_DEBUG("index  %d , size: %d  len %d\n", m_index, m_nLen, m_index);
   assert(m_index <= m_nLen);
 }
 
-bool BufFixedBlock::Finish() { return m_index == m_nLen; }
+bool SendBufBlock::Finish() { return m_index == m_nLen; }
 
-const char *BufFixedBlock::Header() {
+void SendBufBlock::Append(const char *data, int len) {
+  if (m_capcity > m_nLen + len) {
+    memcpy(m_pBuf + m_nLen, data, len);
+    m_nLen += len;
+  } else {
+    int new_len = std::max(2 * m_capcity, m_nLen + len);
+    m_pBuf = (char *)realloc(m_pBuf, new_len);
+    CHECK(m_pBuf);
+    memcpy(m_pBuf + m_nLen, data, len);
+    m_nLen = new_len;
+  }
+}
+
+void SendBufBlock::Clear() {
+  SafeFree(m_pBuf);
+  m_index = 0;
+  m_capcity = 0;
+  m_nLen = 0;
+}
+
+std::string SendBufBlock::ToString() {
+  return std::string(m_pBuf + m_index, WaitSendLen());
+}
+
+const char *SendBufBlock::Header() {
   // LOG_DEBUG("index  %d , size: %d\n", m_index, m_nLen);
   return m_pBuf + m_index;
 }
 
-const char *BufFixedBlock::Data() { return m_pBuf; }
+const char *SendBufBlock::Data() { return m_pBuf; }
 
-int BufFixedBlock::Len() { return m_nLen; }
+int SendBufBlock::Len() { return m_nLen; }
 
-int CBufWriter::Send(int sockfd) {
+WriteSendBufList::WriteSendBufList() {}
+
+WriteSendBufList::~WriteSendBufList() {}
+
+void WriteSendBufList::Append(const char *pdata, int len) {
+  m_buf.emplace_back(pdata, len);
+}
+
+void WriteSendBufList::Append(SendBufBlock &blk) {
+  m_buf.emplace_back(blk.Data(), blk.Len());
+}
+
+void WriteSendBufList::AppendMoveBuf(SendBufBlock &blk) {
+  m_buf.emplace_back(std::move(blk));
+}
+
+int WriteSendBufList::Send(int sockfd) {
   int ret;
   do {
     if (m_buf.empty()) {
       return 0;
     }
 
-    BufFixedBlkPtr &blk = m_buf.front();
-    ret = ::send(sockfd, blk->Header(), blk->WaitSendLen(), 0);
+    SendBufBlock &blk = m_buf.front();
+    LOG(INFO) << "send:" << blk.ToString();
+    ret = ::send(sockfd, blk.Header(), blk.WaitSendLen(), 0);
+    LOG(INFO) << "send res %d\n" << ret;
     if (ret > 0) {
-      blk->Retrieve(ret);
-      if (blk->Finish()) {
+      blk.Retrieve(ret);
+      if (blk.Finish()) {
         m_buf.pop_front();
       }
     } else if (ret < 0) {
       if (errno == EINTR || errno == EAGAIN) {
         ret = 0;
       } else {
-        // LOG_WARNING("send fail %s \n", strerror(errno));
         ret = -1;
       }
     } else {
       ret = -1;
     }
   } while (ret > 0);
-  // LOG_DEBUG("sess write  return value %d \n", ret);
+
   return ret;
 }
 
-int CBufWriter::QueueSize() { return m_buf.size(); }
+int WriteSendBufList::QueueSize() { return m_buf.size(); }

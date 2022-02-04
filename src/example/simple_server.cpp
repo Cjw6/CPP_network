@@ -3,7 +3,9 @@
 #include "network/Socket.h"
 #include "network/TcpConnect.h"
 #include "network/TcpServer.h"
+
 #include "util/Log.h"
+#include <gflags/gflags.h>
 
 #include <climits>
 #include <cstddef>
@@ -13,7 +15,12 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-const std::string log_dir = "./log";
+#include "util/StringSplit.h"
+
+DEFINE_string(logdir, "./log", "日志文件夹路径");
+DEFINE_int32(thread_num, 1, "调度器的线程使用数");
+DEFINE_string(bind_ip, "0.0.0.0", "绑定ip");
+DEFINE_int32(bind_port, 8888, "绑定ip");
 
 struct ClientManager {
   ClientManager();
@@ -26,47 +33,33 @@ ClientManager g_cli_mgr;
 
 int MessageHandler(TcpConnect::Ptr tcp_comm, BufferReader &reader,
                    BufferWriter &writer) {
-  for (int i = 0; i < 10; i++)
-    writer.Append(reader.ReadBegin(), reader.ReadavbleSize());
+  // for (int i = 0; i < 1000000; i++)
+  writer.Append(reader.ReadBegin(), reader.ReadableSize());
   reader.RetrieveAll();
   return 1;
 }
 
-int HugeSendMessageHandler(TcpConnect::Ptr tcp_comm, BufferReader &reader,
-                           BufferWriter &writer) {
-  // LOG(INFO)<< "recv: "<<reader.retrieveAllAsString();
-  // // int size = INT_MAX-1;
-  // std::string pmsg;
-  // for (int i = 0; i < 1024 * 1024 ; i++) {
-  //   pmsg += char('0' + i % 10);
-  // }
-  // for (int i = 0; i < 10; i++)
-  //   writer.Append(pmsg.data(), pmsg.length());
-
+int HugeSendMegaEchoHandler(TcpConnect::Ptr tcp_comm, BufferReader &reader,
+                            BufferWriter &writer) {
+  for (int i = 0; i < 1000000; i++)
+    writer.Append(reader.ReadBegin(), reader.ReadableSize());
+  reader.RetrieveAll();
   return 1;
 }
 
 int HugeRecvMessageHandler(TcpConnect::Ptr tcp_comm, BufferReader &reader,
                            BufferWriter &writer) {
-  // int save_errno = 0;
-  // int res = 0;
-
-  // //这里需要将数据全部读完 。。。。。。。。。
-  // do {
-  //   res = reader.readFd(tcp_comm->GetFd(), &save_errno);
-  // } while (res >= 0);
-
-  // reader.retrieveAll();
-
   return 1;
 }
 
 int main(int argc, char **argv) {
-  InitGlog(argv[0], log_dir.c_str());
+  ::google::ParseCommandLineFlags(&argc, &argv, false);
+  InitGlog(argv[0], FLAGS_logdir.c_str());
+
   signal(SIGPIPE, SIG_IGN);
 
   Dispatcher::Config dispatcher_conf;
-  dispatcher_conf.thread_num = 4;
+  dispatcher_conf.thread_num = FLAGS_thread_num;
   Dispatcher::Ptr disp = std::make_shared<Dispatcher>();
   disp->InitLoop(dispatcher_conf);
 
@@ -76,14 +69,14 @@ int main(int argc, char **argv) {
     LOG(INFO) << "accept cnt:" << ++g_cli_mgr.accep_cnt;
   });
   serv.SetReadCb(MessageHandler);
-  // serv.SetReadCb(HugeSendMessageHandler);
+  // serv.SetReadCb(HugeSendMegaEchoHandler);
   // serv.SetReadCb(HugeRecvMessageHandler);
   serv.SetErrorCb(
       [](TcpConnect::Ptr p) { LOG(INFO) << p->GetName() << " error"; });
 
-  TcpServer::Config conf;
-  conf.ip_ = "0.0.0.0";
-  conf.port = 8888;
+  ServerConfig conf;
+  conf.ip_ = FLAGS_bind_ip;
+  conf.port = FLAGS_bind_port;
   conf.max_listen = 1024;
   LOG(INFO) << "server bind ip " << conf.ip_ << "   port: " << conf.port;
   serv.InitServer(conf, disp);

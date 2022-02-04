@@ -7,35 +7,33 @@
 #include <atomic>
 #include <glog/logging.h>
 
-Channels::Channels(Dispatcher::Ptr &loop, int fd)
-    : disp_(loop), fd_(fd), events_(0) {}
+Channels::Channels(Dispatcher::Ptr &loop) : disp_(loop) {}
 
 Channels::~Channels() {}
 
-// std::string &Channels::GetType() { return class_name; }
-
-void Channels::UpdateEventOption(Channels::EventOption event_option,
+void Channels::UpdateEventOption(int fd, EventOption event_option,
                                  uint32_t event_state) {
-  event_option_ = event_option;
-  events_ = event_state;
-  disp_->UpdateChannels(this);
+  disp_->UpdateChannels(this, fd, event_option, event_state);
 }
 
-void Channels::SetEvents(uint32_t events) { events_ = events; }
-
-void Channels::EnableRead() {
-  events_ |= EPOLLIN;
-  UpdateEventOption(kEventMod, events_);
+void Channels::ResetDispatcher(Dispatcher::Ptr &loop) {
+  DCHECK(loop);
+  disp_ = loop;
 }
 
-void Channels::DisableRead() {
-  events_ &= ~EPOLLIN;
-  UpdateEventOption(kEventMod, events_);
-}
+// void Channels::SetEvents(uint32_t events) { events_ = events; }
 
-void Channels::EnableWrite() {
-  events_ |= EPOLLOUT;
-  UpdateEventOption(kEventMod, events_);
-}
+// void Channels::EnableRead() {
+//   events_ |= EPOLLIN;
+//   UpdateEventOption(kEventMod, events_);
+// }
 
+// void Channels::DisableRead() {
+//   events_ &= ~EPOLLIN;
+//   UpdateEventOption(kEventMod, events_);
+// }
 
+// void Channels::EnableWrite() {
+//   events_ |= EPOLLOUT;
+//   UpdateEventOption(kEventMod, events_);
+// }

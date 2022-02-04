@@ -10,15 +10,15 @@
     // 关于complie_commands.json如何生成可见我上一篇文章的末尾
     // https://zhuanlan.zhihu.com/p/84876003
     // "--include-dir=/usr/lib/gcc/x86_64-linux-gnu/9/include",
-    "--query-driver=/usr/bin/g++-10",
+    // "--query-driver=/bin/x86_64-linux-gnu-g++-10",
     "--compile-commands-dir=build",
     // 同时开启的任务数量
     "-j=6",
     // 告诉clangd用那个clang进行编译，路径参考which clang++的路径
-    // "--query-driver=/usr/bin/clang++",
+    // "--query-driver=/usr/bin/gcc",
     // clang-tidy功能
     "--clang-tidy",
-    // "--clang-tidy-checks=performance-*,bugprone-*",
+    "--clang-tidy-checks=performance-*,bugprone-*",
     // 全局补全（会自动补充头文件）
     "--all-scopes-completion",
     // 更详细的补全内容
@@ -27,6 +27,9 @@
     // "--header-insertion=iwyu",
     // pch优化的位置
     "--pch-storage=disk",
+    "--header-insertion=never",
+    "--query-driver=/usr/bin/g++"
   ],
-  "C_Cpp.intelliSenseEngine":"Disabled"
+  "C_Cpp.intelliSenseEngine":"Disabled",
+  "C_Cpp.default.compileCommands": "build"
 }

@@ -12,18 +12,19 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
-TcpConnect::TcpConnect(TcpServer *serv, Dispatcher::Ptr &disp, std::string ip,
+TcpConnect::TcpConnect(TcpServer *serv, Dispatcher::Ptr &disp, std::string &ip,
                        int port, int fd, std::string name)
-    : Channels(disp, fd), serv_(serv), ip_(ip), port_(port), name_(name),
-      read_cb_(nullptr), error_cb_(nullptr), connected_(true) {
+    : Channels(disp), serv_(serv), ip_(ip), port_(port), name_(name),
+      client_fd_(fd), read_cb_(nullptr), error_cb_(nullptr), connected_(true) {
   if (fd > 0) {
-    UpdateEventOption(kEventAdd, EPOLLIN | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
+    UpdateEventOption(client_fd_, kEventAdd,
+                      EPOLLIN | EPOLLONESHOT | EPOLLRDHUP);
   }
   fcntl(fd, F_SETFL, fcntl(fd, F_GETFD, 0) | O_NONBLOCK);
 }
 
 TcpConnect::~TcpConnect() {
-  LOG(INFO) << "destruct..." << GetFd() << " " << name_;
+  LOG(INFO) << "destruct..." << client_fd_ << " " << name_;
 }
 
 void TcpConnect::HandleEvents() {
@@ -50,9 +51,11 @@ void TcpConnect::HandleEvents() {
 }
 
 int TcpConnect::HandleRead() {
+  LOG(INFO) << "TcpConnect::HandleRead()";
+
   do {
     char buf[1024] = {0};
-    int n = read(fd_, buf, 1024);
+    int n = read(client_fd_, buf, 1024);
     if (n > 0) {
       buffer_reader_.Append(buf, n);
     } else if (n < 0) {
@@ -68,34 +71,42 @@ int TcpConnect::HandleRead() {
   } while (1);
 
   CHECK(read_cb_) << "read_cb is null";
-  read_cb_(shared_from_this(), buffer_reader_, buffer_writer_);
+  if (read_cb_(shared_from_this(), buffer_reader_, buffer_writer_) < 0) {
+    return -1;
+  }
 
   if (buffer_writer_.QueueSize()) {
-    if (buffer_writer_.Send(fd_) < 0) {
+    if (buffer_writer_.Send(client_fd_) < 0) {
       return -1;
     }
   }
 
+  LOG(INFO) << buffer_writer_.QueueSize();
+
   if (buffer_writer_.QueueSize() > 0) {
-    UpdateEventOption(kEventMod,
-                      EPOLLIN | EPOLLOUT | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
+    UpdateEventOption(client_fd_, kEventMod,
+                      EPOLLIN | EPOLLOUT | EPOLLONESHOT | EPOLLRDHUP);
   } else {
-    UpdateEventOption(kEventMod, EPOLLIN | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
+    UpdateEventOption(client_fd_, kEventMod,
+                      EPOLLIN | EPOLLONESHOT | EPOLLRDHUP);
   }
 
   return 1;
 }
 
 int TcpConnect::HandleWrite() {
-  if (buffer_writer_.Send(fd_) < 0) {
+  if (buffer_writer_.Send(client_fd_) < 0) {
     return -1;
   }
 
+  LOG(INFO) << "wait send queue size:" << buffer_writer_.QueueSize();
+
   if (buffer_writer_.QueueSize() > 0) {
-    UpdateEventOption(kEventMod,
-                      EPOLLIN | EPOLLOUT | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
+    UpdateEventOption(client_fd_, kEventMod,
+                      EPOLLIN | EPOLLOUT | EPOLLONESHOT | EPOLLRDHUP);
   } else {
-    UpdateEventOption(kEventMod, EPOLLIN | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
+    UpdateEventOption(client_fd_, kEventMod,
+                      EPOLLIN | EPOLLONESHOT | EPOLLRDHUP);
   }
 
   return 1;
@@ -108,9 +119,9 @@ int TcpConnect::HandleError() {
   if (error_cb_)
     error_cb_(shared_from_this());
 
-  UpdateEventOption(kEventDel,
-                    EPOLLIN | EPOLLOUT | EPOLLET | EPOLLONESHOT | EPOLLRDHUP);
-  close(fd_);
+  UpdateEventOption(client_fd_, kEventDel,
+                    EPOLLIN | EPOLLOUT | EPOLLONESHOT | EPOLLRDHUP);
+  close(client_fd_);
 
   connected_ = false;
   serv_->RemoveSocketByName(GetName());

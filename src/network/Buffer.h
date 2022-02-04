@@ -1,74 +1,57 @@
 #pragma once
 
 // #include "network/BufferWriter.h"
-#include <vector>
-#include <memory>
 #include <deque>
+#include <memory>
+#include <vector>
 
-class CByteBuffer {
+#include "util/ByteBuffer.h"
+#include "util/StringPiece.h"
+
+class SendBufBlock {
 public:
-  CByteBuffer();
-  ~CByteBuffer();
+  SendBufBlock();
+  SendBufBlock(const char *data, int len);
+  ~SendBufBlock();
 
-  char *Begin();
-  char *ReadBegin();
-  char *WriteBegin();
+  SendBufBlock(SendBufBlock &blk) = delete;
+  SendBufBlock &operator=(SendBufBlock &blk) = delete;
 
-  void Retrieve(int nLen);
-  void RetrieveAll();
+  SendBufBlock(SendBufBlock &&blk);
+  SendBufBlock &operator=(SendBufBlock &&blk);
+
+  const char *Data();
+  const char *Header();
+  int Len();
+  int WaitSendLen();
+  void Retrieve(int len);
+  bool Finish();
   void Append(const char *data, int len);
-
-  int DataLen();
-  int ReadavbleSize();
-  int WritableSize();
-  void DebugSpace();
+  void Clear();
+  std::string ToString();
 
 private:
-  // forbidden copy
-  CByteBuffer(CByteBuffer &)=delete;
-  CByteBuffer &operator=(CByteBuffer &)=delete;
-
-  std::vector<char> m_buf;
-  int m_nReadIndex;
-  int m_nWriteIndex;
+  char *m_pBuf;
+  int m_nLen;
+  int m_index;
+  int m_capcity;
 };
 
+// using BufFixedBlkPtr=std::shared_ptr<BufBlock>;
 
-using BufferReader=CByteBuffer;
-
-class BufFixedBlock
-{
+class WriteSendBufList {
 public:
-	// BufFixedBlock(int nLen);
-  BufFixedBlock(const char *data, int len);
-	~BufFixedBlock();
-	const char *Data();
-	const char *Header();
-	int Len();
-	int WaitSendLen();
-	void Retrieve(int len);
-	bool Finish();
+  WriteSendBufList();
+  ~WriteSendBufList();
+  void Append(const char *pdata, int len);
+  void Append(SendBufBlock &blk);
+  void AppendMoveBuf(SendBufBlock &blk);
+  int Send(int sockfd);
+  int QueueSize();
 
 private:
-	char *m_pBuf;
-	int m_nLen;
-	int m_index;
+  std::deque<SendBufBlock> m_buf;
 };
 
-using BufFixedBlkPtr=std::shared_ptr<BufFixedBlock>;
-
-class CBufWriter
-{
-public:
-	CBufWriter();
-	~CBufWriter();
-  void Append(const char* pdata,int len);
-	void Append(BufFixedBlkPtr &pBuf);
-	int Send(int sockfd);
-	int QueueSize();
-
-private:
-	std::deque<BufFixedBlkPtr> m_buf;
-};
-
-using BufferWriter=CBufWriter;
+using BufferReader = ByteBuffer;
+using BufferWriter = WriteSendBufList;

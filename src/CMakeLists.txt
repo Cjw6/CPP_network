@@ -1,25 +1,48 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/3rd)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/3rd/fmt/include)
 
-# add_subdirectory(3rd/threadpool11)
+#util
+add_library(easycpp_util SHARED  
+util/Env.h
+util/FastRand.cpp
+util/FastRand.h
+util/LockFreeMPQueue.hpp
+util/Log.h
+util/NonCopy.h
+util/SafeMem.h
+util/SafeQueue.h
+util/Singleton.h
+util/Thread.cpp
+util/Thread.h
+util/ThreadPool.h
+util/TimeCost.h
+util/StringSplit.cpp
+util/ByteBuffer.h
+util/ByteBuffer.cpp
+util/TimerUs.cpp
+util/TimerUs.h
+)
+target_link_libraries(easycpp_util glog gflags pthread)
 
-# add_library(easycpp_util SHARED  
-# util/Env.h
-# util/FastRand.cpp
-# util/FastRand.h
-# util/LockFreeMPQueue.hpp
-# util/NonCopy.h
-# util/SafeFree.h
-# util/SafeQueue.h
-# util/Singleton.h
-# util/Thread.cpp
-# util/Thread.h
-# util/ThreadPool.h
-# util/TimeCost.h)
+add_library(easycpp_protocol SHARED 
+protocol/adler32.cpp
+protocol/adler32.h
+protocol/EncodeInt.cpp
+protocol/EncodeInt.h
+protocol/MsgBuf.cpp
+protocol/MsgBuf.h
+protocol/MsgBufSlice.cpp
+protocol/MsgBufSlice.h
+protocol/MsgCodec.cpp
+protocol/MsgCodec.h
+protocol/MsgCodecType.h
+protocol/MsgFixedBlock.cpp
+protocol/MsgFixedBlock.h
+protocol/MsgParse.cpp
+protocol/MsgParse.h
+)
 
-# target_link_libraries(easycpp_util )
-
-
+#network
 add_library(easycpp_network SHARED 
 network/Acceptor.cpp
 network/Acceptor.h
@@ -37,42 +60,31 @@ network/TcpConnect.cpp
 network/TcpConnect.h
 network/TcpServer.cpp
 network/TcpServer.h
-protocol/adler32.cpp
-protocol/adler32.h
-protocol/EncodeInt.cpp
-protocol/EncodeInt.h
-protocol/MsgBuf.cpp
-protocol/MsgBuf.h
-protocol/MsgBufSlice.cpp
-protocol/MsgBufSlice.h
-protocol/MsgCodec.cpp
-protocol/MsgCodec.h
-protocol/MsgCodecType.h
-protocol/MsgFixedBlock.cpp
-protocol/MsgFixedBlock.h
-protocol/MsgParse.cpp
-protocol/MsgParse.h
-util/Env.h
-util/FastRand.cpp
-util/FastRand.h
-util/LockFreeMPQueue.hpp
-util/Log.h
-util/NonCopy.h
-util/SafeFree.h
-util/SafeQueue.h
-util/Singleton.h
-util/Thread.cpp
-util/Thread.h
-util/ThreadPool.h
-util/TimeCost.h
 )
+target_link_libraries(easycpp_network easycpp_util)
 
-target_link_libraries(easycpp_network  glog pthread)
+#media
+add_library(easycpp_media SHARED 
+media/RtspServer.cpp
+media/RtspServer.h
+media/RtspSession.cpp
+media/RtspSession.h
+media/Rtp.h
+media/Rtp.cpp
+)
+target_link_libraries(easycpp_media easycpp_network easycpp_util)
 
-
+#simple server
 add_executable(simple_server example/simple_server.cpp)
 target_link_libraries(simple_server easycpp_network)
 
-
+#simple_client
 add_executable(simple_client example/simple_client.cpp)
 target_link_libraries(simple_client easycpp_network)
+
+#rtsp server
+add_executable(simple_rtsp_server example/simple_rtspserver.cpp)
+target_link_libraries(simple_rtsp_server easycpp_media)
+
+add_executable(read_h264 example/read_h264.cpp)
+target_link_libraries(read_h264 easycpp_media)

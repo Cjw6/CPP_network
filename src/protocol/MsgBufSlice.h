@@ -5,7 +5,7 @@
 
 #include <string>
 
-class BufFixedBlock;
+class SendBufBlock;
 class MsgBuf;
 
 class MsgBufSlice {

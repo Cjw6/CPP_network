@@ -2,6 +2,8 @@
 
 #include "util/Thread.h"
 #include "util/ThreadPool.h"
+
+#include <stdint.h>
 #include <atomic>
 #include <deque>
 #include <functional>
@@ -11,10 +13,11 @@
 #include <sys/epoll.h>
 #include <vector>
 
-using TaskCb = std::function<void()>;
 
+// enum EventOption;
 class Channels;
 
+using TaskCb = std::function<void()>;
 class Dispatcher {
 public:
   enum WorkMode { kSTMode, kMTMode };
@@ -37,7 +40,7 @@ public:
   void AddEvent(int fd, int state);
   void DeleteEvent(int fd, int state);
   void ModifyEvent(int fd, int state);
-  void UpdateChannels(Channels *pc);
+  void UpdateChannels(Channels *pc,int fd,uint32_t option,uint32_t events);
 
   //从其他的线程添加任务。。。
   void AddTaskInDispatcher(TaskCb task);
