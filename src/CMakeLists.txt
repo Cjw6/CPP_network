@@ -60,6 +60,8 @@ network/TcpConnect.cpp
 network/TcpConnect.h
 network/TcpServer.cpp
 network/TcpServer.h
+network/TimerController.cpp
+network/TimerController.h
 )
 target_link_libraries(easycpp_network easycpp_util)
 
@@ -86,5 +88,10 @@ target_link_libraries(simple_client easycpp_network)
 add_executable(simple_rtsp_server example/simple_rtspserver.cpp)
 target_link_libraries(simple_rtsp_server easycpp_media)
 
+#read h264
 add_executable(read_h264 example/read_h264.cpp)
 target_link_libraries(read_h264 easycpp_media)
+
+#example_timer
+add_executable(example_timer example/example_timer.cpp)
+target_link_libraries(example_timer easycpp_network)

@@ -5,10 +5,11 @@
 #ifndef SERVERPROJECT_CHANNELS_H
 #define SERVERPROJECT_CHANNELS_H
 
-#include "Dispatcher.h"
+// #include "Dispatcher.h"
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <sys/epoll.h>
 
@@ -18,11 +19,14 @@ enum EventOption : uint32_t {
   kEventDel = EPOLL_CTL_DEL
 };
 
+class Dispatcher;
+using DispatcherPtr = std::shared_ptr<Dispatcher>;
+
 class Channels {
   friend class Dispatcher;
 
 public:
-  explicit Channels(Dispatcher::Ptr &loop);
+  explicit Channels(DispatcherPtr &loop);
   // explicit Channels(Dispatcher::Ptr &loop, int fd);
   virtual ~Channels();
 
@@ -30,7 +34,7 @@ public:
                          uint32_t event_state);
   void SetEvents(uint32_t events) { events_ = events; }
 
-  void ResetDispatcher(Dispatcher::Ptr &loop);
+  void ResetDispatcher(DispatcherPtr &loop);
 
   virtual void HandleEvents() = 0;
   virtual int GetFd() = 0;
@@ -54,7 +58,7 @@ protected:
   // int fd_;
   // EventOption event_option_;
   uint32_t events_;
-  Dispatcher::Ptr disp_;
+  DispatcherPtr disp_;
 };
 
 // void HandleEvents(Channels* p);

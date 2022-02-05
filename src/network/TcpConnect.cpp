@@ -28,26 +28,28 @@ TcpConnect::~TcpConnect() {
 }
 
 void TcpConnect::HandleEvents() {
-  disp_->ExecTask([this] {
-    if (events_ & (EPOLLIN | EPOLLPRI | EPOLLRDHUP)) {
-      if (HandleRead() <= 0) {
-        HandleError();
-        return;
-      }
-    }
+  disp_->RunTask(
+      [this] {
+        if (events_ & (EPOLLIN | EPOLLPRI | EPOLLRDHUP)) {
+          if (HandleRead() <= 0) {
+            HandleError();
+            return;
+          }
+        }
 
-    if (events_ & EPOLLOUT) {
-      if (HandleWrite() <= 0) {
-        HandleError();
-        return;
-      }
-    }
+        if (events_ & EPOLLOUT) {
+          if (HandleWrite() <= 0) {
+            HandleError();
+            return;
+          }
+        }
 
-    if (events_ & EPOLLERR) {
-      HandleError();
-      return;
-    }
-  });
+        if (events_ & EPOLLERR) {
+          HandleError();
+          return;
+        }
+      },
+      true);
 }
 
 int TcpConnect::HandleRead() {

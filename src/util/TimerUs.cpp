@@ -1,4 +1,4 @@
-#include "Timer.h"
+#include "TimerUs.h"
 
 #include <sys/time.h>
 
@@ -15,14 +15,28 @@ TimeUs TimeUs::Now() {
   return TimeUs(seconds * kMicroSecondsPerSecond + tv.tv_usec);
 }
 
-void TimeUs::AddTime(int us) { timestamp_ += us; }
+void TimeUs::AddTime(const TimeUs &t) { AddTimeUs(t.GetTimeUs()); }
 
-TimeUs TimeUs::operator-(TimeUs &t) {
+void TimeUs::AddTimeMs(int ms) { timestamp_ += ms * 1000; }
+
+void TimeUs::AddTimeUs(int us) { timestamp_ += us; }
+
+bool TimeUs::Valid() { return timestamp_ != 0; }
+
+TimeUs TimeUs::operator+(const TimeUs &t) {
+  return TimeUs(timestamp_ + t.timestamp_);
+}
+
+TimeUs TimeUs::operator-(const TimeUs &t) {
   return TimeUs(timestamp_ - t.timestamp_);
 }
 
-bool TimeUs::operator==(TimeUs &t) { return timestamp_ == t.timestamp_; }
+bool TimeUs::operator==(const TimeUs &t) { return timestamp_ == t.timestamp_; }
 
-bool TimeUs::operator>(TimeUs &t) { return timestamp_ > t.timestamp_; }
+bool operator>(const TimeUs &l, const TimeUs &r) {
+  return l.GetTimeUs() < r.GetTimeUs();
+}
 
-bool TimeUs::operator<(TimeUs &t) { return timestamp_ < t.timestamp_; }
+bool operator<(const TimeUs &l, const TimeUs &r) {
+  return l.GetTimeUs() < r.GetTimeUs();
+}

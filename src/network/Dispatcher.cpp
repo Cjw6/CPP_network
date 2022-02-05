@@ -1,8 +1,9 @@
 #include "Dispatcher.h"
-
 #include "Channels.h"
+
 #include "util/Thread.h"
 #include "util/ThreadPool.h"
+
 #include <functional>
 #include <glog/logging.h>
 #include <memory>
@@ -43,38 +44,64 @@ bool Dispatcher::InitLoop(Config &conf) {
     LOG(ERROR) << "create epoll fail ...";
     return false;
   }
+
+  timer_ctl_ = std::make_unique<TimerController>();
   return true;
 }
 
 void Dispatcher::Dispatch() {
   thread_id_ = GetThreadId();
 
+  {
+    std::lock_guard<std::mutex> lg(exec_queue_mutex_);
+    for (auto &task : task_exec_queue_) {
+      task();
+    }
+    task_exec_queue_.clear();
+    for (auto &task : task_wait_queue_) {
+      task();
+    }
+    task_wait_queue_.clear();
+  }
+
   running_flag_ = 1;
+  int interval = timer_ctl_->CalIntervalMs();
+  LOG(INFO) << "fisrt interval " << interval;
+  int event_count = 0;
+
   while (running_flag_) {
-    for (auto task : task_exec_queue_) {
-      task();
-    }
-
-    for (auto task : task_wait_queue_) {
-      task();
-    }
-
-    int event_count = 0;
-    do {
-      event_count =
-          epoll_wait(epoll_fd_, &epoll_lists_[0], epoll_lists_.size(), -1);
-    } while (event_count < 0 && errno == EINTR);
+    event_count =
+        epoll_wait(epoll_fd_, &epoll_lists_[0], epoll_lists_.size(), interval);
 
     if (event_count < 0) {
       PLOG(ERROR) << "epoll wait:";
+      if (errno == EINTR) {
+
+      } else {
+        LOG(ERROR) << "dispatcher quit\n";
+        return;
+      }
     }
 
+    timer_ctl_->Schedule();
     ChannelHandelEvent(event_count);
+
+    exec_queue_mutex_.lock();
+    std::swap(task_exec_queue_, task_wait_queue_);
+    exec_queue_mutex_.unlock();
+    for (auto &task : task_exec_queue_) {
+      task();
+    }
+    task_exec_queue_.clear();
+
+    interval = timer_ctl_->CalIntervalMs();
   }
 }
 
-void Dispatcher::AddTaskInDispatcher(TaskCb task) {
-  if (thread_id_ == GetThreadId()) {
+void Dispatcher::RunTask(TaskCb task, bool use_threadpool) {
+  if (work_mode_ == kMTMode && use_threadpool) {
+    pool_->enqueue(std::move(task));
+  } else if (thread_id_ == GetThreadId()) {
     task();
   } else {
     std::lock_guard<std::mutex> lg(exec_queue_mutex_);
@@ -82,12 +109,22 @@ void Dispatcher::AddTaskInDispatcher(TaskCb task) {
   }
 }
 
-void Dispatcher::ExecTask(TaskCb task) {
-  if (work_mode_ == kSTMode) {
-    task();
-  } else {
-    pool_->enqueue(std::move(task));
+TimerTask::Id Dispatcher::AddTimerTask(TimerTask::Func func, TimeUs delay,
+                                       bool singleshot) {
+  if (!timer_ctl_) {
+    return -1;
   }
+
+  return timer_ctl_->AddTask(std::move(func), delay, singleshot);
+}
+
+void Dispatcher::RemoveTimerTask(TimerTask::Id &id) {
+  if (!timer_ctl_) {
+    id = -1;
+    return;
+  }
+  
+  timer_ctl_->RemoveTimerTask(id);
 }
 
 void Dispatcher::AddEvent(int fd, int state) {
@@ -134,28 +171,3 @@ void Dispatcher::ChannelHandelEvent(int n) {
     chann->HandleEvents();
   }
 }
-
-// void Dispatcher::EventMultiThread(int n) {
-//   LOG(INFO) << "EventMultiThread events n:" << n;
-//   for (int i = 0; i < n; i++) {
-//     CHECK(epoll_lists_[i].data.ptr);
-
-//     Channels *chann = reinterpret_cast<Channels *>(epoll_lists_[i].data.ptr);
-//     LOG(INFO) << chann->GetType();
-
-//     chann->SetEvents(epoll_lists_[i].events);
-//     chann->HandleEvents();
-//   }
-// }
-
-// void Dispatcher::SpecialDispatch(Channels *p) {
-//   switch (str2int(p->GetType().c_str())) {
-//   case (str2int("Acceptor")):
-//     p->HandleEvents();
-//     break;
-//   default:
-//     LOG(INFO)<<"post task...";
-//     pool_->AddTask(std::bind(&Channels::HandleEvents, p));
-//     break;
-//   }
-// }

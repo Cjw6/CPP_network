@@ -18,7 +18,7 @@
     // "--query-driver=/usr/bin/gcc",
     // clang-tidy功能
     "--clang-tidy",
-    "--clang-tidy-checks=performance-*,bugprone-*",
+    // "--clang-tidy-checks=performance-*,bugprone-*",
     // 全局补全（会自动补充头文件）
     "--all-scopes-completion",
     // 更详细的补全内容
