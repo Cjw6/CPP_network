@@ -130,3 +130,17 @@ int TcpConnect::HandleError() {
 
   return -1;
 }
+
+void TcpConnect::Send(char *buf, int len) {
+  buffer_writer_.Append(buf, len);
+  if (buffer_writer_.Send(client_fd_) < 0) {
+    HandleError();
+  }
+}
+
+void TcpConnect::Send(const SendBufBlock::Ptr &buf) {
+  buffer_writer_.Append(buf);
+  if (buffer_writer_.Send(client_fd_) < 0) {
+    HandleError();
+  }
+}

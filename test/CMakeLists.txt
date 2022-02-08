@@ -5,7 +5,8 @@ add_executable(run_test
 RunTest.cpp
 TestAnyVoidPointer.cpp
 TestTime.cpp
+TestReadH264.cpp
 )
 
-target_link_libraries(run_test easycpp_util gtest)
+target_link_libraries(run_test easycpp_util easycpp_media easycpp_network gtest)
 

@@ -21,12 +21,14 @@ util/ByteBuffer.h
 util/ByteBuffer.cpp
 util/TimerUs.cpp
 util/TimerUs.h
+util/Adler32.cpp
+util/Adler32.h
+util/File.h
+util/File.cpp
 )
 target_link_libraries(easycpp_util glog gflags pthread)
 
 add_library(easycpp_protocol SHARED 
-protocol/adler32.cpp
-protocol/adler32.h
 protocol/EncodeInt.cpp
 protocol/EncodeInt.h
 protocol/MsgBuf.cpp
@@ -62,6 +64,8 @@ network/TcpServer.cpp
 network/TcpServer.h
 network/TimerController.cpp
 network/TimerController.h
+network/WakeUp.cpp
+network/WakeUp.h
 )
 target_link_libraries(easycpp_network easycpp_util)
 
@@ -71,8 +75,15 @@ media/RtspServer.cpp
 media/RtspServer.h
 media/RtspSession.cpp
 media/RtspSession.h
-media/Rtp.h
-media/Rtp.cpp
+media/ReadH264File.cpp
+media/ReadH264File.h
+media/RtpPacket.h
+media/MediaSession.h
+media/MediaSession.cpp
+media/RtpSource.h
+media/RtpSource.cpp
+media/RtpSession.h
+media/RtpSession.cpp
 )
 target_link_libraries(easycpp_media easycpp_network easycpp_util)
 
@@ -95,3 +106,7 @@ target_link_libraries(read_h264 easycpp_media)
 #example_timer
 add_executable(example_timer example/example_timer.cpp)
 target_link_libraries(example_timer easycpp_network)
+
+#xample_wakeup
+add_executable(example_wakeup example/example_wakeup.cpp)
+target_link_libraries(example_wakeup easycpp_network)

@@ -10,6 +10,8 @@
 
 class SendBufBlock {
 public:
+  using Ptr = std::shared_ptr<SendBufBlock>;
+
   SendBufBlock();
   SendBufBlock(const char *data, int len);
   ~SendBufBlock();
@@ -44,13 +46,13 @@ public:
   WriteSendBufList();
   ~WriteSendBufList();
   void Append(const char *pdata, int len);
-  void Append(SendBufBlock &blk);
-  void AppendMoveBuf(SendBufBlock &blk);
+  void Append(const SendBufBlock::Ptr &blk);
+  // void Append(SendBufBlock &&blk);
   int Send(int sockfd);
   int QueueSize();
 
 private:
-  std::deque<SendBufBlock> m_buf;
+  std::deque<SendBufBlock::Ptr> m_buf;
 };
 
 using BufferReader = ByteBuffer;

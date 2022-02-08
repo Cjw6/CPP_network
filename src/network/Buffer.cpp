@@ -17,8 +17,6 @@
 // static const char kCRLF[] = "\r\n";
 // static const char kCRLFCRLF[] = "\r\n\r\n";
 
-
-
 SendBufBlock::SendBufBlock()
     : m_pBuf(nullptr), m_nLen(0), m_index(0), m_capcity(0) {}
 
@@ -109,15 +107,11 @@ WriteSendBufList::WriteSendBufList() {}
 WriteSendBufList::~WriteSendBufList() {}
 
 void WriteSendBufList::Append(const char *pdata, int len) {
-  m_buf.emplace_back(pdata, len);
+  m_buf.emplace_back(std::make_shared<SendBufBlock>(pdata, len));
 }
 
-void WriteSendBufList::Append(SendBufBlock &blk) {
-  m_buf.emplace_back(blk.Data(), blk.Len());
-}
-
-void WriteSendBufList::AppendMoveBuf(SendBufBlock &blk) {
-  m_buf.emplace_back(std::move(blk));
+void WriteSendBufList::Append(const SendBufBlock::Ptr &blk) {
+  m_buf.emplace_back(blk);
 }
 
 int WriteSendBufList::Send(int sockfd) {
@@ -127,13 +121,13 @@ int WriteSendBufList::Send(int sockfd) {
       return 0;
     }
 
-    SendBufBlock &blk = m_buf.front();
-    LOG(INFO) << "send:" << blk.ToString();
-    ret = ::send(sockfd, blk.Header(), blk.WaitSendLen(), 0);
-    LOG(INFO) << "send res %d\n" << ret;
+    auto &blk = m_buf.front();
+    // LOG(INFO) << "send:" << blk->ToString();
+    ret = ::send(sockfd, blk->Header(), blk->WaitSendLen(), 0);
+    // LOG(INFO) << "send res " << ret;
     if (ret > 0) {
-      blk.Retrieve(ret);
-      if (blk.Finish()) {
+      blk->Retrieve(ret);
+      if (blk->Finish()) {
         m_buf.pop_front();
       }
     } else if (ret < 0) {

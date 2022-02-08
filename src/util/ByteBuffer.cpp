@@ -96,6 +96,8 @@ int ByteBuffer::ReadableSize() { return m_nWriteIndex - m_nReadIndex; }
 
 int ByteBuffer::WritableSize() { return Capcity() - m_nWriteIndex; }
 
+int ByteBuffer::Size() { return m_nWriteIndex; }
+
 int ByteBuffer::Capcity() { return m_capcity; }
 
 int ByteBuffer::Resize(int n) {
@@ -103,21 +105,16 @@ int ByteBuffer::Resize(int n) {
     return 1;
   }
 
-  LOG(INFO) << " resize bytebuffer";
+  // LOG(INFO) << " resize bytebuffer";
 
   char *new_buf = (char *)realloc(m_buf, n);
   CHECK(new_buf) << " ByteBuffer realloc fail";
   m_capcity = n;
   m_buf = new_buf;
   memset(WriteBegin(), 0, WritableSize());
-
   return 1;
 }
 
-void ByteBuffer::SetReadIndex(int n){
-  m_nReadIndex=n;
-}
+void ByteBuffer::SetReadIndex(int n) { m_nReadIndex = n; }
 
-void ByteBuffer::SetWriteIndex(int n) {
-  m_nWriteIndex=n;
-}
+void ByteBuffer::SetWriteIndex(int n) { m_nWriteIndex = n; }

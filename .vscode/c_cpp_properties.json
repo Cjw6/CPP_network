@@ -9,7 +9,6 @@
             "compilerPath": "/usr/bin/gcc",
             "cppStandard": "c++17",
             "cStandard": "c17",
-            // "compileCommands": "${workspaceFolder}/build/Linux/compile_commands.json",
             "configurationProvider": "ms-vscode.cmake-tools"
         }
     ],

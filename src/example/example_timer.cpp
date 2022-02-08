@@ -37,11 +37,10 @@ int main(int argc, char **argv) {
         return 1;
       },
       2 * 1000 * 1000, false);
-  
-  std::thread t1([&]() { std::this_thread::sleep_for(std::chrono::seconds(5)); 
-    disp->RunTask([&]{
-      disp->RemoveTimerTask(timer_id2);
-    });
+
+  std::thread t1([&]() {
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    disp->RunTask([&] { disp->RemoveTimerTask(timer_id2); });
   });
 
   disp->Dispatch();

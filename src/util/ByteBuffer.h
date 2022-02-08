@@ -21,15 +21,17 @@ public:
   void ResetBegin();
 
   void Append(const char *data, int len);
-  
+
   int ReadableSize();
   int WritableSize();
-  int Capcity();      // vector capcity
+  
+  int Size();    //返回已经写入的大小
+  int Capcity(); //返回容量
   int Resize(int n);
 
   void SetReadIndex(int n);
   void SetWriteIndex(int n);
-  
+
   static const int kDefaultSize;
 
 private:

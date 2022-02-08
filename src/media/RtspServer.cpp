@@ -3,6 +3,8 @@
 
 #include <glog/logging.h>
 
+// int RtspServer::MediaSessIdGen = 0;
+
 RtspServer::RtspServer() {}
 
 RtspServer::~RtspServer() {}
@@ -34,14 +36,48 @@ int RtspServer::SetNewConn(int fd, std::string &ip, int port) {
       return -1;
   });
 
-  sess->SetErrorCb([&](TcpConnect::Ptr p) {
-    LOG(INFO) << "tcp server error cb";
-    // DCHECK(error_cb_) << " error_cb_ is null";
-    if (error_cb_)
-      error_cb_(p);
-  });
-
   conn_mgr_->AddConnectToManager(sess->GetName(), sess);
-
   return 1;
+}
+
+MediaSessionId RtspServer::AddMediaSess(MediaSession::Ptr &media_sess) {
+  if (!media_sess) {
+    return -1;
+  }
+  rtsp_name_id_map_.emplace(media_sess->GetSessName(), media_sess->GetSessId());
+  rtsp_id_media_map_.emplace(media_sess->GetSessId(), media_sess);
+  return media_sess->GetSessId();
+}
+
+MediaSession::Ptr RtspServer::FindMediaSessionByMediaId(MediaSessionId id) {
+  auto it = rtsp_id_media_map_.find(id);
+  if (it == rtsp_id_media_map_.end()) {
+    return MediaSession::Ptr();
+  } else {
+    return it->second;
+  }
+}
+
+MediaSession::Ptr RtspServer::FindMediaSessionByRtspName(std::string &name) {
+  auto it = rtsp_name_id_map_.find(name);
+  if (it == rtsp_name_id_map_.end()) {
+    return MediaSession::Ptr();
+  } else {
+    return FindMediaSessionByMediaId(it->second);
+  }
+}
+
+void RtspServer::PushFrame(MediaSessionId id, char *frame, int size,
+                           bool keyframe) {
+  auto it = rtsp_id_media_map_.find(id);
+  if (it == rtsp_id_media_map_.end()) {
+    return;
+  }
+
+  auto &media_sess = it->second;
+  if (!media_sess) {
+    return;
+  }
+
+  media_sess->PushFrame(frame, size, keyframe);
 }

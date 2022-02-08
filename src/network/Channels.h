@@ -39,28 +39,9 @@ public:
   virtual void HandleEvents() = 0;
   virtual int GetFd() = 0;
 
-  // virtual std::string &GetType();
-  // virtual int HandleRead();
-  // virtual int HandleWrite();
-  // virtual int HandleError();
-
-  // void EnableRead();
-  // void DisableRead();
-  // void EnableWrite();
-  // void DisableWrite();
-
-  // EventOption GetEventOption() { return event_option_; }
-  // uint32_t GetEvents() { return events_; }
-  // void SetFd(int fd) { fd_ = fd; }
-  // int GetFd() { return fd_; }
-
 protected:
-  // int fd_;
-  // EventOption event_option_;
   uint32_t events_;
   DispatcherPtr disp_;
 };
-
-// void HandleEvents(Channels* p);
 
 #endif // SERVERPROJECT_CHANNELS_H

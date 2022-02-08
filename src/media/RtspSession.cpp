@@ -1,4 +1,6 @@
-#include "RtspSession.h"
+#include "media/RtspSession.h"
+#include "media/RtpSession.h"
+#include "media/RtspServer.h"
 
 #include "util/StringSplit.h"
 
@@ -27,13 +29,45 @@ static int getLineFromBuf(char *buf, char *line, int max_char) {
 RtspSession::RtspSession(TcpServer *serv, Dispatcher::Ptr &disp,
                          std::string &ip, int port, int fd, std::string name)
     : TcpConnect(serv, disp, ip, port, fd, name), reponse_seq_(0),
-      rtp_channel_(-1), rtcp_channel_(-1) {}
+      rtp_channel_(-1), rtcp_channel_(-1) {
+  SetErrorCb([this](TcpConnect::Ptr tcp) {
+    auto rtsp_serv = dynamic_cast<RtspServer *>(serv_);
+    if (!rtsp_serv) {
+      return -1;
+    }
+    auto media_sess = rtsp_serv->FindMediaSessionByRtspName(rtsp_url_suffix_);
+    if (media_sess) {
+      media_sess->RemoveRtpSession(client_fd_);
+    }
+    return 1;
+  });
+}
 
-RtspSession::~RtspSession() {}
+RtspSession::~RtspSession() {
+  auto rtsp_serv = dynamic_cast<RtspServer *>(serv_);
+  if (!rtsp_serv) {
+    auto media_sess = rtsp_serv->FindMediaSessionByRtspName(rtsp_url_suffix_);
+    if (media_sess) {
+      media_sess->RemoveRtpSession(client_fd_);
+    }
+  }
+}
+
+RtspServer *RtspSession::GetRtspServer() {
+  return dynamic_cast<RtspServer *>(serv_);
+}
 
 int RtspSession::ReadHandler() {
   LOG(INFO) << "rtsp session read handler";
 
+  if (*buffer_reader_.ReadBegin() != '$') {
+    return HandleRtsp();
+  } else {
+    return HandleRtcp();
+  }
+}
+
+int RtspSession::HandleRtsp() {
   static std::unordered_map<std::string, std::function<int(RtspSession *)>>
       s_method_table;
   static std::once_flag method_reg_flag;
@@ -48,20 +82,22 @@ int RtspSession::ReadHandler() {
                            [](RtspSession *p) { return p->HandleCmd_PLAY(); });
   });
 
+  LOG(INFO) << buffer_reader_.ReadBegin();
+
   std::string msg = buffer_reader_.GetStrUntilCRLFCRLF();
   if (!msg.size()) {
-    LOG(ERROR) << "rtsp protocol error";
-    return -1;
+    // buffer_reader_.RetrieveAll();
+    return 1;
   }
 
   std::vector<StringPiece> pieces;
   StringSplitUseStrtok(msg.data(), pieces, "\r\n");
 
   // debug
-  DLOG(INFO) << msg;
-  for (auto &s : pieces) {
-    DLOG(INFO) << s;
-  }
+  // DLOG(INFO) << msg;
+  // for (auto &s : pieces) {
+  //   DLOG(INFO) << s;
+  // }
 
   char method[40] = {0};
   char url[100] = {0};
@@ -80,6 +116,7 @@ int RtspSession::ReadHandler() {
 
   rtsp_url_ = url;
   rtsp_version_ = version;
+  LOG(INFO) << "read rtsp url version:" << url << " " << version;
 
   request_param_map_.clear();
 
@@ -113,10 +150,10 @@ int RtspSession::ReadHandler() {
   auto iter_Cseq = request_param_map_.find("CSeq");
   if (iter_Cseq == request_param_map_.end()) {
     LOG(ERROR) << "rtsp find CSeq fail";
-    return -1;
+    // return -1;
+  } else {
+    reponse_seq_ = atoi(iter_Cseq->second.data());
   }
-
-  reponse_seq_ = atoi(iter_Cseq->second.data());
 
   // debug
   for (auto &[k, v] : request_param_map_) {
@@ -125,6 +162,8 @@ int RtspSession::ReadHandler() {
 
   auto iter_metod = s_method_table.find(method);
   if (iter_metod == s_method_table.end()) {
+    LOG(WARNING) << "rtsp method not found:" << method;
+    return -1;
   }
 
   if (iter_metod->second(this) < 0) {
@@ -132,6 +171,18 @@ int RtspSession::ReadHandler() {
     return -1;
   }
 
+  return 1;
+}
+
+int RtspSession::HandleRtcp() {
+  LOG(INFO) << "handle rtcp...";
+  char *peek = buffer_reader_.ReadBegin();
+  if (peek[0] == '$' && buffer_reader_.ReadableSize() > 4) {
+    uint32_t pkt_size = peek[2] << 8 | peek[3];
+    if (pkt_size + 4 >= buffer_reader_.ReadableSize()) {
+      buffer_reader_.Retrieve(pkt_size + 4);
+    }
+  }
   return 1;
 }
 
@@ -162,6 +213,26 @@ int RtspSession::HandleCmd_DESCRIBE() {
   memset(response_buf, 0, sizeof(response_buf));
 
   std::string localip = GetRtspLocalIpFromUrl();
+  LOG(INFO) << "GetRtspLocalIpFromUrl() " << localip;
+
+  rtsp_url_suffix_ = GetRtspUrlSuffixFromUrl();
+  if (rtsp_url_suffix_.empty()) {
+    return -1;
+  }
+
+  auto rtsp_serv = dynamic_cast<RtspServer *>(serv_);
+  if (!rtsp_serv) {
+    return -1;
+  }
+
+  auto media_sess = rtsp_serv->FindMediaSessionByRtspName(rtsp_url_suffix_);
+  if (media_sess) {
+    rtp_sess_ = std::make_shared<RtpSession>(shared_from_this(), client_fd_);
+    media_sess->AddRtpSession(client_fd_, rtp_sess_);
+  } else {
+    LOG(ERROR) << "not found media sess";
+    return -1;
+  }
 
   snprintf(sdp_buf, sizeof(sdp_buf),
            "v=0\r\n"
@@ -203,7 +274,13 @@ int RtspSession::HandleCmd_SETUP() {
     return -1;
   }
 
+  LOG(INFO) << "debug piece";
+  for (auto &s : pieces) {
+    LOG(INFO) << s;
+  }
+
   if (pieces[0] == "RTP/AVP/TCP") {
+    LOG(INFO) << "rtsp use  tcp ";
     int rtpChannel;
     int rtcpChannel;
 
@@ -248,9 +325,12 @@ int RtspSession::HandleCmd_PLAY() {
           "Range: npt=0.000-\r\n"
           "Session: 66334873; timeout=60\r\n\r\n",
           reponse_seq_);
-  
-  buffer_writer_.Append(response_buf,strlen(response_buf));
 
+  if (rtp_sess_) {
+    rtp_sess_->EnablePlay(true);
+  }
+
+  buffer_writer_.Append(response_buf, strlen(response_buf));
   return 1;
 }
 
@@ -270,4 +350,21 @@ std::string RtspSession::GetRtspLocalIpFromUrl() {
   }
 
   return std::string();
+}
+
+std::string RtspSession::GetRtspUrlSuffixFromUrl() {
+  if (rtsp_url_.empty()) {
+    return std::string();
+  }
+  uint16_t port = 0;
+  char ip[64] = {0};
+  char suffix[64] = {0};
+  if (sscanf(rtsp_url_.data() + 7, "%[^:]:%hu/%s", ip, &port, suffix) == 3) {
+    return std::string(suffix);
+  } else if (sscanf(rtsp_url_.data() + 7, "%[^/]/%s", ip, suffix) == 2) {
+    port = 554;
+    return std::string(suffix);
+  } else {
+    return std::string();
+  };
 }

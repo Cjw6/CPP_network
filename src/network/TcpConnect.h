@@ -17,6 +17,7 @@ class TcpConnect : public Channels,
                    public std::enable_shared_from_this<TcpConnect> {
 public:
   friend class TcpServer;
+  friend class RtpSession;
 
   using Ptr = std::shared_ptr<TcpConnect>;
   using ReadCb =
@@ -31,10 +32,12 @@ public:
   void HandleEvents() override;
   int GetFd() override { return client_fd_; }
 
+  void Send(char *buf, int len);
+  void Send(const SendBufBlock::Ptr &buf);
+
   void SetReadCb(ReadCb cb) { read_cb_ = std::move(cb); }
   // void SetWriteCb(WriteCb cb) { write_cb_ = cb; }
   void SetErrorCb(ErrorCb cb) { error_cb_ = std::move(cb); }
-  int Send(int n);
 
   const std::string &GetName() { return name_; }
   const std::string &GetIP() { return ip_; }

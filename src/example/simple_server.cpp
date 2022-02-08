@@ -69,8 +69,6 @@ int main(int argc, char **argv) {
     LOG(INFO) << "accept cnt:" << ++g_cli_mgr.accep_cnt;
   });
   serv.SetReadCb(MessageHandler);
-  // serv.SetReadCb(HugeSendMegaEchoHandler);
-  // serv.SetReadCb(HugeRecvMessageHandler);
   serv.SetErrorCb(
       [](TcpConnect::Ptr p) { LOG(INFO) << p->GetName() << " error"; });
 

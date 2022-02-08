@@ -17,9 +17,10 @@
 // enum EventOption;
 class Channels;
 class TimerController;
+class WakeChannel;
 
 using TaskCb = std::function<void()>;
-class Dispatcher {
+class Dispatcher : public std::enable_shared_from_this<Dispatcher> {
 public:
   enum WorkMode { kSTMode, kMTMode };
   struct Config {
@@ -34,8 +35,8 @@ public:
   Dispatcher();
   ~Dispatcher();
 
-  bool InitLoop(Config &config);
   void Dispatch();
+  bool InitLoop(Config &config);
 
   //事件更改
   void AddEvent(int fd, int state);
@@ -44,15 +45,18 @@ public:
   void UpdateChannels(Channels *pc, int fd, uint32_t option, uint32_t events);
 
   //从其他的线程添加任务。。。
-  void RunTask(TaskCb task, bool use_threadpool = false);
-  TimerTask::Id AddTimerTask(TimerTask::Func func, TimeUs delay, bool singleshot = true);
+  void RunTask(const TaskCb &task, bool use_threadpool = false);
+  TimerTask::Id AddTimerTask(TimerTask::Func func, TimeUs delay,
+                             bool singleshot = true);
   void RemoveTimerTask(TimerTask::Id &id);
+  void Wake();
 
   const WorkMode &GetWorkMode() { return work_mode_; }
 
 private:
   void ChannelHandelEvent(int n);
 
+  std::thread run_thread_;
   WorkMode work_mode_;
 
   int epoll_fd_;
@@ -71,4 +75,5 @@ private:
   int thread_num_;
 
   std::unique_ptr<TimerController> timer_ctl_;
+  std::unique_ptr<WakeChannel> wake_;
 };

@@ -7,17 +7,18 @@
 
 #include <chrono>
 #include <cstdint>
-#include <glog/logging.h>
 #include <iostream>
 #include <ratio>
 
+#include "util/Log.h"
+
 // 这里使用 steady clock 是比较准确的
 
-class TimeCostTool {
+class TimeCost {
 public:
-  TimeCostTool(std::string name = "")
+  TimeCost(std::string name = "")
       : name_(name), p(std::chrono::steady_clock::now()) {}
-  ~TimeCostTool() = default;
+  ~TimeCost() = default;
   void set_name(std::string str) { name_ = std::move(str); }
   void restart() { p = std::chrono::steady_clock::now(); }
 

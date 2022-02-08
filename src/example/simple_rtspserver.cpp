@@ -1,9 +1,13 @@
+#include "media/ReadH264File.h"
 #include "media/RtspServer.h"
-
 #include "util/Log.h"
+#include "util/TimeCost.h"
+#include "util/TimerUs.h"
+
 #include <gflags/gflags.h>
 
 #include <signal.h>
+#include <thread>
 
 DEFINE_string(logdir, "./log", "日志文件夹路径");
 DEFINE_int32(thread_num, 1, "调度器的线程使用数");
@@ -34,14 +38,44 @@ int main(int argc, char **argv) {
   Dispatcher::Ptr disp = std::make_shared<Dispatcher>();
   disp->InitLoop(dispatcher_conf);
 
-  RtspServer serv;
+  RtspServer rtsp_serv;
+  MediaSession::Ptr media_session = std::make_shared<MediaSession>("live");
+  MediaSessionId media_id = rtsp_serv.AddMediaSess(media_session);
+
   ServerConfig conf;
   conf.ip_ = FLAGS_bind_ip;
   conf.port = FLAGS_bind_port;
   conf.max_listen = 1024;
   LOG(INFO) << "rtsp server bind ip " << conf.ip_ << "   port: " << conf.port;
-  serv.InitService(conf, disp);
+  rtsp_serv.InitService(conf, disp);
+
+  std::thread push_thread([&]() {
+    ReadH264File r;
+    std::string path = "/media/cjw/work1/media/output2.h264";
+    // std::string path = "resource/test.h264";
+    r.Open(path);
+    ByteBuffer buffer;
+    int index = 0;
+
+    TimeCost tc;
+    while (1) {
+      if (r.ReadFrame(buffer, 500 * 1024) < 0) {
+        break;
+      }
+
+      bool key_frame =
+          RtpSourceH264::IsKeyFrame(buffer.Begin(), buffer.Size());
+      // LOG(INFO) << "read frame from file" << index++ << " key frame?"
+                // << key_frame;
+      rtsp_serv.PushFrame(media_id, buffer.ReadBegin(), buffer.ReadableSize(),
+                          key_frame);
+
+      EC_SleepUs(1000 * 1000 / 25 - static_cast<int>(tc.duration_us()));
+      tc.restart();
+    }
+  });
 
   disp->Dispatch();
+  push_thread.join();
   return 0;
 }

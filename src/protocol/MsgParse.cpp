@@ -1,8 +1,9 @@
+#include "util/Adler32.h"
 #include "MsgParse.h"
 #include "MsgCodec.h"
 #include <cassert>
 #include "EncodeInt.h"
-#include "adler32.h"
+
 
 MsgUnitValue::MsgUnitValue():type(CODEC_NULL){}
 

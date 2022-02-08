@@ -1,11 +1,13 @@
-#include "Dispatcher.h"
-#include "Channels.h"
+#include "network/Dispatcher.h"
+#include "network/Channels.h"
+#include "network/WakeUp.h"
 
 #include "util/Thread.h"
 #include "util/ThreadPool.h"
 
+#include "util/Log.h"
+
 #include <functional>
-#include <glog/logging.h>
 #include <memory>
 #include <mutex>
 #include <sys/epoll.h>
@@ -45,13 +47,17 @@ bool Dispatcher::InitLoop(Config &conf) {
     return false;
   }
 
+  auto self = shared_from_this();
   timer_ctl_ = std::make_unique<TimerController>();
+  wake_ = std::make_unique<WakeChannel>(self);
+  if (wake_->InitEventFd() < 0) {
+    return false;
+  }
   return true;
 }
 
 void Dispatcher::Dispatch() {
   thread_id_ = GetThreadId();
-
   {
     std::lock_guard<std::mutex> lg(exec_queue_mutex_);
     for (auto &task : task_exec_queue_) {
@@ -68,7 +74,8 @@ void Dispatcher::Dispatch() {
   int interval = timer_ctl_->CalIntervalMs();
   LOG(INFO) << "fisrt interval " << interval;
   int event_count = 0;
-
+  int64_t loop_cnt = 0;
+  // LOG(INFO) << running_flag_.load();
   while (running_flag_) {
     event_count =
         epoll_wait(epoll_fd_, &epoll_lists_[0], epoll_lists_.size(), interval);
@@ -87,25 +94,35 @@ void Dispatcher::Dispatch() {
     ChannelHandelEvent(event_count);
 
     exec_queue_mutex_.lock();
-    std::swap(task_exec_queue_, task_wait_queue_);
+    if (task_wait_queue_.size())
+      std::swap(task_exec_queue_, task_wait_queue_);
     exec_queue_mutex_.unlock();
+
+    LOG(INFO) << " async task queue size " << task_exec_queue_.size();
     for (auto &task : task_exec_queue_) {
       task();
     }
     task_exec_queue_.clear();
 
     interval = timer_ctl_->CalIntervalMs();
+
+    loop_cnt++;
+    LOG(INFO) << "print loop_cnt" << loop_cnt << " interval" << interval;
   }
+  LOG(INFO) << "quit";
 }
 
-void Dispatcher::RunTask(TaskCb task, bool use_threadpool) {
+void Dispatcher::RunTask(const TaskCb &task, bool use_threadpool) {
   if (work_mode_ == kMTMode && use_threadpool) {
     pool_->enqueue(std::move(task));
   } else if (thread_id_ == GetThreadId()) {
     task();
   } else {
-    std::lock_guard<std::mutex> lg(exec_queue_mutex_);
-    task_wait_queue_.emplace_back(task);
+    {
+      std::lock_guard<std::mutex> lg(exec_queue_mutex_);
+      task_wait_queue_.emplace_back(std::move(task));
+    }
+    wake_->WakeUp();
   }
 }
 
@@ -123,8 +140,15 @@ void Dispatcher::RemoveTimerTask(TimerTask::Id &id) {
     id = -1;
     return;
   }
-  
+
   timer_ctl_->RemoveTimerTask(id);
+}
+
+void Dispatcher::Wake() {
+  if (!wake_) {
+    return;
+  }
+  wake_->WakeUp();
 }
 
 void Dispatcher::AddEvent(int fd, int state) {

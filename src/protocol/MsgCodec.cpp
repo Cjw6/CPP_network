@@ -2,7 +2,7 @@
 #include "MsgBuf.h"
 #include "MsgBufSlice.h"
 #include "EncodeInt.h"
-#include "adler32.h"
+#include "util/Adler32.h"
 #include <cassert>
 
 uint32_t MsgCodec::reserve_len = 4 * sizeof(uint32_t) + sizeof(MsgCodec::started_code); //保存 总子节的长度  保存元素的个数 添加主类型 子类型  

@@ -28,3 +28,7 @@ private:
 
 bool operator>(const TimeUs &l, const TimeUs &r);
 bool operator<(const TimeUs &l, const TimeUs &r);
+
+void EC_SleepUs(int us);
+void EC_SleepMs(int ms);
+void EC_Sleep(int sec);

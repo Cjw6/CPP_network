@@ -5,7 +5,6 @@
 #ifndef CWORK_SAFEQUEUE_H
 #define CWORK_SAFEQUEUE_H
 
-#include <array>
 #include <condition_variable>
 #include <deque>
 #include <glog/logging.h>
