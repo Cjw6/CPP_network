@@ -55,7 +55,7 @@ void MediaSession::PushFrame(char *frame, int frame_size, bool key_frame) {
   if (UserNum()) {
     // LOG(INFO) << "push frame to send ....";
     if (source_) {
-      source_->SendFrame(frame, frame_size, key_frame);
+      source_->SendFrameByRtpTcp(frame, frame_size, key_frame);
     }
   }
 }

@@ -10,7 +10,7 @@ public:
   ~RtpSourceH264();
 
   void SetSendRtpPacketCb(const SendRtpPktCb &cb) { send_cb_ = cb; }
-  void SendFrame(char *frame, int len, bool key_frame);
+  void SendFrameByRtpTcp(char *frame, int len, bool key_frame);
 
   static bool IsKeyFrame(char *data, int size);
 

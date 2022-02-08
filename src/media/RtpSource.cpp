@@ -1,6 +1,7 @@
 #include "media/RtpSource.h"
 
 #include "util/Log.h"
+#include <arpa/inet.h>
 
 #define RTP_VESION 2
 #define RTP_PAYLOAD_TYPE_H264 96
@@ -29,7 +30,8 @@ static void rtpHeaderInit(struct RtpPacketTcp *rtpPacket, uint8_t csrcLen,
 bool RtpSourceH264::IsKeyFrame(char *data, int size) {
   if (size > 4) {
     // 0x67:sps ,0x65:IDR, 0x6: SEI
-    // printf("0x%x 0x%x 0x%x 0x%x 0x%x 0x%x \n",(int)data[0],(int)data[1],(int)data[2],(int)data[3],(int)data[4],(int)data[5]);
+    // printf("0x%x 0x%x 0x%x 0x%x 0x%x 0x%x
+    // \n",(int)data[0],(int)data[1],(int)data[2],(int)data[3],(int)data[4],(int)data[5]);
     if (data[4] == 0x67 || data[4] == 0x65 || data[4] == 0x6 ||
         data[4] == 0x27) {
       return true;
@@ -43,7 +45,8 @@ RtpSourceH264::RtpSourceH264()
 
 RtpSourceH264::~RtpSourceH264() {}
 
-void RtpSourceH264::SendFrame(char *frame, int frame_len, bool keyframe) {
+void RtpSourceH264::SendFrameByRtpTcp(char *frame, int frame_len,
+                                      bool keyframe) {
   if (!rtp_packet_buf_) {
     rtp_packet_buf_ = (char *)malloc(RTP_PACKET_MALLOC_SIZE);
     rtpHeaderInit((RtpPacketTcp *)rtp_packet_buf_, 0, 0, 0, RTP_VESION,
@@ -70,9 +73,9 @@ void RtpSourceH264::SendFrame(char *frame, int frame_len, bool keyframe) {
     rtp_packet_tcp->header[1] = 0;
     rtp_packet_tcp->header[2] = (packet_size & 0xFF00) >> 8;
     rtp_packet_tcp->header[3] = (packet_size)&0xFF;
-    rtp_packet_tcp->rtpHeader.timestamp = time_stamp_;
-    rtp_packet_tcp->rtpHeader.seq = seq_;
-    seq_++;
+    rtp_packet_tcp->rtpHeader.timestamp = htonl(time_stamp_);
+    rtp_packet_tcp->rtpHeader.seq = htons(seq_++);
+
     if (send_cb_) {
       send_cb_(rtp_packet_buf_, packet_size + 4, keyframe);
     }
@@ -100,8 +103,8 @@ void RtpSourceH264::SendFrame(char *frame, int frame_len, bool keyframe) {
       rtp_packet_tcp->header[1] = 0;
       rtp_packet_tcp->header[2] = (packet_size & 0xFF00) >> 8;
       rtp_packet_tcp->header[3] = (packet_size)&0xFF;
-      rtp_packet_tcp->rtpHeader.timestamp = time_stamp_;
-      rtp_packet_tcp->rtpHeader.seq = seq_;
+      rtp_packet_tcp->rtpHeader.timestamp = htonl(time_stamp_);
+      rtp_packet_tcp->rtpHeader.seq = htons(seq_++);
 
       seq_++;
       pos += RTP_MAX_PKT_SIZE;
@@ -116,17 +119,23 @@ void RtpSourceH264::SendFrame(char *frame, int frame_len, bool keyframe) {
       rtp_packet_tcp->payload[1] |= 0x40; // end
 
       memcpy(rtp_packet_tcp->payload + 2, frame + pos, remainPktSize + 2);
-      int packet_size = remainPktSize + RTP_HEADER_SIZE + 2;
+      int packet_size = remainPktSize + 2 + RTP_HEADER_SIZE + 2;
+
+      rtp_packet_tcp->header[0] = '$';
+      rtp_packet_tcp->header[1] = 0;
+      rtp_packet_tcp->header[2] = (packet_size & 0xFF00) >> 8;
+      rtp_packet_tcp->header[3] = (packet_size)&0xFF;
+      rtp_packet_tcp->rtpHeader.timestamp = htonl(time_stamp_);
+      rtp_packet_tcp->rtpHeader.seq = htons(seq_++);
 
       if (send_cb_) {
         send_cb_(rtp_packet_buf_, packet_size + 4, keyframe);
       }
-
-      
+      seq_++;
     }
   }
 
-  time_stamp_ += 9000 / 25;
+  time_stamp_ += 90000 / 25;
 }
 // {
 

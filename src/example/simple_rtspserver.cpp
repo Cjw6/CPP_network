@@ -63,10 +63,9 @@ int main(int argc, char **argv) {
         break;
       }
 
-      bool key_frame =
-          RtpSourceH264::IsKeyFrame(buffer.Begin(), buffer.Size());
+      bool key_frame = RtpSourceH264::IsKeyFrame(buffer.Begin(), buffer.Size());
       // LOG(INFO) << "read frame from file" << index++ << " key frame?"
-                // << key_frame;
+      //           << key_frame << " frame_size" << buffer.ReadableSize();
       rtsp_serv.PushFrame(media_id, buffer.ReadBegin(), buffer.ReadableSize(),
                           key_frame);
 
