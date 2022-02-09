@@ -13,11 +13,9 @@
 #include <string>
 #include <sys/epoll.h>
 
-enum EventOption : uint32_t {
-  kEventAdd = EPOLL_CTL_ADD,
-  kEventMod = EPOLL_CTL_MOD,
-  kEventDel = EPOLL_CTL_DEL
-};
+#define kEventAdd EPOLL_CTL_ADD
+#define kEventMod EPOLL_CTL_MOD
+#define kEventDel EPOLL_CTL_DEL
 
 class Dispatcher;
 using DispatcherPtr = std::shared_ptr<Dispatcher>;
@@ -30,8 +28,7 @@ public:
   // explicit Channels(Dispatcher::Ptr &loop, int fd);
   virtual ~Channels();
 
-  void UpdateEventOption(int fd, EventOption event_option,
-                         uint32_t event_state);
+  void UpdateEventOption(int fd, uint32_t event_option, uint32_t event_state);
   void SetEvents(uint32_t events) { events_ = events; }
 
   void ResetDispatcher(DispatcherPtr &loop);

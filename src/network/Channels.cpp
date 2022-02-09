@@ -11,7 +11,7 @@ Channels::Channels(Dispatcher::Ptr &loop) : disp_(loop) {}
 
 Channels::~Channels() {}
 
-void Channels::UpdateEventOption(int fd, EventOption event_option,
+void Channels::UpdateEventOption(int fd, uint32_t event_option,
                                  uint32_t event_state) {
   disp_->UpdateChannels(this, fd, event_option, event_state);
 }

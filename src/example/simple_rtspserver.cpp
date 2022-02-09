@@ -68,8 +68,9 @@ int main(int argc, char **argv) {
       //           << key_frame << " frame_size" << buffer.ReadableSize();
       rtsp_serv.PushFrame(media_id, buffer.ReadBegin(), buffer.ReadableSize(),
                           key_frame);
-
-      EC_SleepUs(1000 * 1000 / 25 - static_cast<int>(tc.duration_us()));
+      int interval_us = 1000 * 1000 / 25 - static_cast<int>(tc.duration_us());
+      // LOG(INFO) << "capture interval:" << interval_us;
+      EC_SleepUs(interval_us);
       tc.restart();
     }
   });

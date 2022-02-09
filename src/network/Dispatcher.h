@@ -55,6 +55,7 @@ public:
 
 private:
   void ChannelHandelEvent(int n);
+  void HandlelAsyncQueue();
 
   std::thread run_thread_;
   WorkMode work_mode_;

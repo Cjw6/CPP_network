@@ -24,7 +24,7 @@ int WakeChannel::InitEventFd() {
 }
 
 void WakeChannel::HandleEvents() {
-  if (events_ & (EPOLLIN | EPOLLPRI | EPOLLRDHUP)) {
+  if (events_ & (EPOLLIN | EPOLLET | EPOLLPRI | EPOLLRDHUP)) {
     if (HandleRead() <= 0) {
       return;
     }
@@ -44,7 +44,7 @@ int WakeChannel::WakeUp() {
 int WakeChannel::HandleRead() {
   uint64_t one = 1;
   ssize_t n = 0;
-  // 如果有多次的唤醒  统一处理 
+  // 如果有多次的唤醒  统一处理
   do {
     n = read(event_fd_, &one, sizeof one);
     if (n != sizeof one) {

@@ -13,6 +13,8 @@
 
 class TcpServer;
 
+#define TCP_CONN_ERR  1
+
 class TcpConnect : public Channels,
                    public std::enable_shared_from_this<TcpConnect> {
 public:
@@ -47,6 +49,7 @@ protected:
   int HandleRead();
   int HandleWrite();
   int HandleError();
+  void HandleIO();
 
   std::string name_;
   TcpServer *serv_;
@@ -58,8 +61,8 @@ protected:
   BufferWriter buffer_writer_;
 
   ReadCb read_cb_;
-  // WriteCb write_cb_;
   ErrorCb error_cb_;
 
   std::atomic<bool> connected_;
+  int state_;
 };

@@ -25,7 +25,7 @@ void RtpSession::SendRtpPacket(char *frame, int len, bool key_frame) {
           if (!tcp) {
             return;
           }
-          LOG(INFO) << "rtp send ...";
+          // LOG(INFO) << "rtp send ...";
           tcp->Send(buf);
         });
       }

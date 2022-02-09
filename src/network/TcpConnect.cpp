@@ -15,7 +15,8 @@
 TcpConnect::TcpConnect(TcpServer *serv, Dispatcher::Ptr &disp, std::string &ip,
                        int port, int fd, std::string name)
     : Channels(disp), serv_(serv), ip_(ip), port_(port), name_(name),
-      client_fd_(fd), read_cb_(nullptr), error_cb_(nullptr), connected_(true) {
+      client_fd_(fd), read_cb_(nullptr), error_cb_(nullptr), connected_(true),
+      state_(0) {
   if (fd > 0) {
     UpdateEventOption(client_fd_, kEventAdd,
                       EPOLLIN | EPOLLONESHOT | EPOLLRDHUP);
@@ -24,32 +25,36 @@ TcpConnect::TcpConnect(TcpServer *serv, Dispatcher::Ptr &disp, std::string &ip,
 }
 
 TcpConnect::~TcpConnect() {
-  LOG(INFO) << "destruct..." << client_fd_ << " " << name_;
+  LOG(WARNING) << "destruct..." << client_fd_ << " " << name_;
 }
 
 void TcpConnect::HandleEvents() {
-  disp_->RunTask(
-      [this] {
-        if (events_ & (EPOLLIN | EPOLLPRI | EPOLLRDHUP)) {
-          if (HandleRead() <= 0) {
-            HandleError();
-            return;
-          }
-        }
+  if (state_ & TCP_CONN_ERR) {
+    HandleError();
+  } else {
+    disp_->RunTask([this] { HandleIO(); }, true);
+  }
+}
 
-        if (events_ & EPOLLOUT) {
-          if (HandleWrite() <= 0) {
-            HandleError();
-            return;
-          }
-        }
+void TcpConnect::HandleIO() {
+  if (events_ & (EPOLLIN | EPOLLPRI | EPOLLRDHUP)) {
+    if (HandleRead() <= 0) {
+      HandleError();
+      return;
+    }
+  }
 
-        if (events_ & EPOLLERR) {
-          HandleError();
-          return;
-        }
-      },
-      true);
+  if (events_ & EPOLLOUT) {
+    if (HandleWrite() <= 0) {
+      HandleError();
+      return;
+    }
+  }
+
+  if (events_ & EPOLLERR) {
+    HandleError();
+    return;
+  }
 }
 
 int TcpConnect::HandleRead() {
@@ -115,17 +120,19 @@ int TcpConnect::HandleWrite() {
 }
 
 int TcpConnect::HandleError() {
-  auto self = shared_from_this();
+
   PLOG(WARNING) << "tcp conn handle error";
 
   if (error_cb_)
     error_cb_(shared_from_this());
 
   UpdateEventOption(client_fd_, kEventDel,
-                    EPOLLIN | EPOLLOUT | EPOLLONESHOT | EPOLLRDHUP);
+                    EPOLLIN | EPOLLOUT | EPOLLONESHOT | EPOLLHUP | EPOLLRDHUP);
   close(client_fd_);
 
   connected_ = false;
+
+  auto self = shared_from_this();
   serv_->RemoveSocketByName(GetName());
 
   return -1;
@@ -139,8 +146,15 @@ void TcpConnect::Send(char *buf, int len) {
 }
 
 void TcpConnect::Send(const SendBufBlock::Ptr &buf) {
+  if (state_ & TCP_CONN_ERR) {
+    return;
+  }
+
+  if (!connected_) {
+    return;
+  }
   buffer_writer_.Append(buf);
   if (buffer_writer_.Send(client_fd_) < 0) {
-    HandleError();
+    state_ &= TCP_CONN_ERR;
   }
 }

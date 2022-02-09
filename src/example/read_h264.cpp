@@ -10,7 +10,7 @@ int main() {
   int index = 0;
 
   while (1) {
-    if (r.ReadFrame(buffer) < 0) {
+    if (r.ReadFrame(buffer, 500 * 1024) < 0) {
       break;
     }
     LOG(INFO) << "frame cnt" << index++

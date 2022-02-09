@@ -91,23 +91,18 @@ void Dispatcher::Dispatch() {
     }
 
     timer_ctl_->Schedule();
+    HandlelAsyncQueue();
     ChannelHandelEvent(event_count);
 
-    exec_queue_mutex_.lock();
-    if (task_wait_queue_.size())
-      std::swap(task_exec_queue_, task_wait_queue_);
-    exec_queue_mutex_.unlock();
-
-    LOG(INFO) << " async task queue size " << task_exec_queue_.size();
-    for (auto &task : task_exec_queue_) {
-      task();
-    }
-    task_exec_queue_.clear();
-
     interval = timer_ctl_->CalIntervalMs();
+    if (interval < 0) {
+      interval = 13;
+    } else {
+      interval = std::min(interval, 13);
+    }
 
     loop_cnt++;
-    LOG(INFO) << "print loop_cnt" << loop_cnt << " interval" << interval;
+    // LOG(INFO) << "print loop_cnt" << loop_cnt << " interval" << interval;
   }
   LOG(INFO) << "quit";
 }
@@ -190,8 +185,21 @@ void Dispatcher::ChannelHandelEvent(int n) {
 
     Channels *chann = reinterpret_cast<Channels *>(epoll_lists_[i].data.ptr);
     CHECK(chann);
-
+    // LOG(INFO) << epoll_lists_[i].events;
     chann->SetEvents(epoll_lists_[i].events);
     chann->HandleEvents();
   }
+}
+
+void Dispatcher::HandlelAsyncQueue() {
+  exec_queue_mutex_.lock();
+  if (task_wait_queue_.size())
+    std::swap(task_exec_queue_, task_wait_queue_);
+  exec_queue_mutex_.unlock();
+
+  // LOG(INFO) << " async task queue size " << task_exec_queue_.size();
+  for (auto &task : task_exec_queue_) {
+    task();
+  }
+  task_exec_queue_.clear();
 }
