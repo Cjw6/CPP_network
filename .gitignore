@@ -3,3 +3,5 @@ log
 demo
 changelog
 release
+resource/testReadH264.h264
+resource/testReadAAC.aac

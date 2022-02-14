@@ -1,3 +1,4 @@
+#include "media/ReadAACFile.h"
 #include "media/ReadH264File.h"
 #include "media/RtspServer.h"
 #include "util/Log.h"
@@ -40,6 +41,8 @@ int main(int argc, char **argv) {
 
   RtspServer rtsp_serv;
   MediaSession::Ptr media_session = std::make_shared<MediaSession>("live");
+  media_session->AddRtpSource(MEDIA_SESS_CHANNEL_0, new RtpSourceH264);
+  media_session->AddRtpSource(MEDIA_SESS_CHANNEL_1, new RtpSourceAAC(48000, 2));
   MediaSessionId media_id = rtsp_serv.AddMediaSess(media_session);
 
   ServerConfig conf;
@@ -49,7 +52,9 @@ int main(int argc, char **argv) {
   LOG(INFO) << "rtsp server bind ip " << conf.ip_ << "   port: " << conf.port;
   rtsp_serv.InitService(conf, disp);
 
-  std::thread push_thread([&]() {
+  std::thread push_video_thread([&]() {
+    // return;
+
     ReadH264File r;
     std::string path = "/media/cjw/work1/media/output2.h264";
     // std::string path = "resource/test.h264";
@@ -66,8 +71,8 @@ int main(int argc, char **argv) {
       bool key_frame = RtpSourceH264::IsKeyFrame(buffer.Begin(), buffer.Size());
       // LOG(INFO) << "read frame from file" << index++ << " key frame?"
       //           << key_frame << " frame_size" << buffer.ReadableSize();
-      rtsp_serv.PushFrame(media_id, buffer.ReadBegin(), buffer.ReadableSize(),
-                          key_frame);
+      rtsp_serv.PushFrame(media_id, MEDIA_SESS_CHANNEL_0, buffer.ReadBegin(),
+                          buffer.ReadableSize(), key_frame);
       int interval_us = 1000 * 1000 / 25 - static_cast<int>(tc.duration_us());
       // LOG(INFO) << "capture interval:" << interval_us;
       EC_SleepUs(interval_us);
@@ -75,7 +80,44 @@ int main(int argc, char **argv) {
     }
   });
 
+  /*
+   * 如果采样频率是44100
+   * 一般AAC每个1024个采样为一帧
+   * 所以一秒就有 44100 / 1024 = 43帧
+   * 时间增量就是 44100 / 43 = 1025
+   * 一帧的时间为 1 / 43 = 23ms
+   */
+
+  std::thread push_audio_thread([&]() {
+    ReadAACFile r;
+    std::string path = "resource/test.aac";
+    // std::string path = "resource/test.h264";
+    r.Open(path);
+    ByteBuffer buffer;
+    int index = 0;
+
+    TimeCost tc;
+    while (1) {
+      if (r.ReadFrame(buffer, 5 * 1024) < 0) {
+        break;
+      }
+
+      // bool key_frame = RtpSourceH264::IsKeyFrame(buffer.Begin(),
+      // buffer.Size()); LOG(INFO) << "read frame from file" << index++ << " key
+      // frame?"
+      //           << key_frame << " frame_size" << buffer.ReadableSize();
+      rtsp_serv.PushFrame(media_id, MEDIA_SESS_CHANNEL_1, buffer.Begin() + 7,
+                          buffer.ReadableSize() - 7, false);
+      int interval_us =
+          1000 * 1000 / (48000 / 1024) - static_cast<int>(tc.duration_us());
+      // LOG(INFO) << "capture interval:" << interval_us;
+      EC_SleepUs(interval_us);
+      tc.restart();
+    }
+  });
+
   disp->Dispatch();
-  push_thread.join();
+  push_video_thread.join();
+  push_audio_thread.join();
   return 0;
 }

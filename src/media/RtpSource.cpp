@@ -27,6 +27,10 @@ static void rtpHeaderInit(struct RtpPacketTcp *rtpPacket, uint8_t csrcLen,
   rtpPacket->rtpHeader.ssrc = ssrc;
 }
 
+RtpSource::RtpSource() : send_cb_(nullptr) {}
+
+RtpSource::~RtpSource() {}
+
 bool RtpSourceH264::IsKeyFrame(char *data, int size) {
   if (size > 4) {
     // 0x67:sps ,0x65:IDR, 0x6: SEI
@@ -41,9 +45,19 @@ bool RtpSourceH264::IsKeyFrame(char *data, int size) {
 }
 
 RtpSourceH264::RtpSourceH264()
-    : send_cb_(nullptr), rtp_packet_buf_(nullptr), time_stamp_(0), seq_(0) {}
+    : rtp_packet_buf_(nullptr), time_stamp_(0), seq_(0) {}
 
 RtpSourceH264::~RtpSourceH264() {}
+
+std::string RtpSourceH264::GetMediaDescription(uint16_t port) {
+  char buf[100] = {0};
+  sprintf(buf, "m=video %hu RTP/AVP 96", port); // \r\nb=AS:2000
+  return std::string(buf);
+}
+
+std::string RtpSourceH264::GetAttribute() {
+  return std::string("a=rtpmap:96 H264/90000");
+}
 
 void RtpSourceH264::SendFrameByRtpTcp(char *frame, int frame_len,
                                       bool keyframe) {
@@ -54,7 +68,7 @@ void RtpSourceH264::SendFrameByRtpTcp(char *frame, int frame_len,
   } else {
     memset(rtp_packet_buf_ + RTP_HEADER_SIZE + 4, 0, RTP_MAX_PKT_SIZE);
   }
-
+  LOG(INFO)<<"send h264 rtp packet;";
   RtpPacketTcp *rtp_packet_tcp = (RtpPacketTcp *)rtp_packet_buf_;
 
   char naluType = frame[0];
@@ -137,27 +151,98 @@ void RtpSourceH264::SendFrameByRtpTcp(char *frame, int frame_len,
 
   time_stamp_ += 90000 / 25;
 }
-// {
 
-//   memcpy(rtp_packet_tcp->payload, frame, frame_size);
+uint32_t RtpSourceAAC::AACSampleRate[16] = {
+    96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
+    16000, 12000, 11025, 8000,  7350,  0,     0,     0 /*reserved */
+};
 
-//   int packet_size = frame_size + RTP_HEADER_SIZE;
-//   rtp_packet_tcp->header[0] = '$';
-//   rtp_packet_tcp->header[1] = 0;
-//   rtp_packet_tcp->header[2] = (packet_size & 0xFF00) >> 8;
-//   rtp_packet_tcp->header[3] = (packet_size)&0xFF;
+RtpSourceAAC::RtpSourceAAC(int samplerate, int channels)
+    : rtp_packet_buf_(nullptr), samplerate_(samplerate), channels_(channels),
+      time_stamp_(0), seq_(0) {}
 
-//   int send_size = packet_size + 4;
+RtpSourceAAC::~RtpSourceAAC() {}
 
-//   if(socket_session_map_.size()){
-//     auto it=socket_session_map_.begin();
-//     it.
-//   }
+std::string RtpSourceAAC::GetMediaDescription(uint16_t port) {
+  char buf[100] = {0};
+  sprintf(buf, "m=audio %hu RTP/AVP 97", port); // \r\nb=AS:64
+  return std::string(buf);
+}
 
-//   rtp_packet_tcp->rtpHeader.seq = htons(rtp_packet_tcp->rtpHeader.seq);
-//   rtp_packet_tcp->rtpHeader.timestamp =
-//       htonl(rtp_packet_tcp->rtpHeader.timestamp);
-//   rtp_packet_tcp->rtpHeader.ssrc = htonl(rtp_packet_tcp->rtpHeader.ssrc);
+std::string RtpSourceAAC::GetAttribute() {
+  char buf[500] = {0};
+  sprintf(buf, "a=rtpmap:97 MPEG4-GENERIC/%u/%u\r\n", samplerate_, channels_);
 
-// }
-// }
+  uint8_t index = 0;
+  for (index = 0; index < 16; index++) {
+    if (AACSampleRate[index] == samplerate_) {
+      break;
+    }
+  }
+
+  if (index == 16) {
+    return ""; // error
+  }
+
+  uint8_t profile = 1;
+  char config[10] = {0};
+
+  sprintf(config, "%02x%02x", (uint8_t)((profile + 1) << 3) | (index >> 1),
+          (uint8_t)((index << 7) | (channels_ << 3)));
+  sprintf(buf + strlen(buf),
+          "a=fmtp:97 profile-level-id=1;"
+          "mode=AAC-hbr;"
+          "sizelength=13;indexlength=3;indexdeltalength=3;"
+          "config=%04u",
+          atoi(config));
+
+  return std::string(buf);
+}
+
+void RtpSourceAAC::SendFrameByRtpTcp(char *frame, int frame_len,
+                                     bool key_frame) {
+  if (!rtp_packet_buf_) {
+    rtp_packet_buf_ = (char *)malloc(5 * 1024);
+    // rtpHeaderInit((RtpPacketTcp *)rtp_packet_buf_, 0, 0, 0, RTP_VESION,
+    // RTP_PAYLOAD_TYPE_AAC, 0, 0, 0, 0x88923423);
+    rtpHeaderInit((RtpPacketTcp *)rtp_packet_buf_, 0, 0, 0, RTP_VESION,
+                  RTP_PAYLOAD_TYPE_AAC, 1, 0, 0, 0x32411);
+  } else {
+    memset(rtp_packet_buf_ + RTP_HEADER_SIZE + 4, 0, RTP_MAX_PKT_SIZE);
+  }
+  LOG(INFO)<<"send aac rtp packet;";
+  RtpPacketTcp *rtp_packet_tcp = (RtpPacketTcp *)rtp_packet_buf_;
+
+  // char naluType = frame[0];
+
+  // if (frame_len <= RTP_MAX_PKT_SIZE) {
+  // nalu长度小于最大包场：单一NALU单元模式
+  /*
+   *   0 1 2 3 4 5 6 7 8 9
+   *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   *  |F|NRI|  Type   | a single NAL unit ... |
+   *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+   */
+
+  rtp_packet_tcp->payload[0] = 0x00;
+  rtp_packet_tcp->payload[1] = 0x10;
+  rtp_packet_tcp->payload[2] = (frame_len & 0x1FE0) >> 5; //高8位
+  rtp_packet_tcp->payload[3] = (frame_len & 0x1F) << 3;   //低5位
+  // LOG(INFO) << frame_len;
+  memcpy(rtp_packet_tcp->payload + 4, frame, frame_len);
+  int packet_size = frame_len + RTP_HEADER_SIZE + 4;
+
+  rtp_packet_tcp->header[0] = '$';
+  rtp_packet_tcp->header[1] = 2;
+  rtp_packet_tcp->header[2] = (packet_size & 0xFF00) >> 8;
+  rtp_packet_tcp->header[3] = (packet_size)&0xFF;
+  rtp_packet_tcp->rtpHeader.timestamp = htonl(time_stamp_);
+  rtp_packet_tcp->rtpHeader.seq = htons(seq_++);
+
+  if (send_cb_) {
+    send_cb_(rtp_packet_buf_, packet_size + 4, key_frame);
+  }
+  time_stamp_ += 1025;
+  seq_++;
+  // }
+}

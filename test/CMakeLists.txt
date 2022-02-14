@@ -6,6 +6,7 @@ RunTest.cpp
 TestAnyVoidPointer.cpp
 TestTime.cpp
 TestReadH264.cpp
+TestReadAAC.cpp
 )
 
 target_link_libraries(run_test easycpp_util easycpp_media easycpp_network gtest)

@@ -9,7 +9,7 @@ TEST(ReadH264, 1) {
   ReadH264File r;
 
   std::string src_path = "resource/test.h264";
-  std::string dst_path = "resource/testReadH264h264";
+  std::string dst_path = "resource/testReadH264.h264";
 
   char *h264_data_src = nullptr;
   int h264_size_src = ReadAllFileData(src_path.c_str(), h264_data_src);
@@ -39,6 +39,7 @@ TEST(ReadH264, 1) {
   }
 
   fclose(write_h264_fp);
+  write_h264_fp=nullptr;
 
   char *h264_data_dst = nullptr;
   int h264_size_dst = ReadAllFileData(dst_path.c_str(), h264_data_dst);
@@ -50,6 +51,9 @@ TEST(ReadH264, 1) {
       Adler32((unsigned char *)h264_data_dst, h264_size_dst);
 
   EXPECT_EQ(check_src, check_dst);
+
+  free(h264_data_dst);
+  free(h264_data_src);
 
   // return 0;
 }

@@ -71,19 +71,24 @@ target_link_libraries(easycpp_network easycpp_util)
 
 #media
 add_library(easycpp_media SHARED 
+media/MediaSession.h
+media/MediaSession.cpp
+
 media/RtspServer.cpp
 media/RtspServer.h
 media/RtspSession.cpp
 media/RtspSession.h
-media/ReadH264File.cpp
-media/ReadH264File.h
 media/RtpPacket.h
-media/MediaSession.h
-media/MediaSession.cpp
+
 media/RtpSource.h
 media/RtpSource.cpp
 media/RtpSession.h
 media/RtpSession.cpp
+
+media/ReadH264File.cpp
+media/ReadH264File.h
+media/ReadAACFile.h
+media/ReadAACFile.cpp
 )
 target_link_libraries(easycpp_media easycpp_network easycpp_util)
 

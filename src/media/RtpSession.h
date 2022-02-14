@@ -21,3 +21,4 @@ private:
   bool play_;
   bool has_key_frame_;
 };
+

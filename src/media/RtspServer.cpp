@@ -67,17 +67,17 @@ MediaSession::Ptr RtspServer::FindMediaSessionByRtspName(std::string &name) {
   }
 }
 
-void RtspServer::PushFrame(MediaSessionId id, char *frame, int size,
-                           bool keyframe) {
+void RtspServer::PushFrame(MediaSessionId id, int channel_id, char *frame,
+                           int size, bool keyframe) {
   auto it = rtsp_id_media_map_.find(id);
   if (it == rtsp_id_media_map_.end()) {
     return;
-  }
+  } 
 
   auto &media_sess = it->second;
   if (!media_sess) {
     return;
   }
 
-  media_sess->PushFrame(frame, size, keyframe);
+  media_sess->PushFrame(channel_id, frame, size, keyframe);
 }

@@ -225,33 +225,37 @@ int RtspSession::HandleCmd_DESCRIBE() {
     return -1;
   }
 
+  std::string sdp;
   auto media_sess = rtsp_serv->FindMediaSessionByRtspName(rtsp_url_suffix_);
   if (media_sess) {
     rtp_sess_ = std::make_shared<RtpSession>(shared_from_this(), client_fd_);
     media_sess->AddRtpSession(client_fd_, rtp_sess_);
+    sdp = media_sess->GetSDP(localip);
   } else {
     LOG(ERROR) << "not found media sess";
     return -1;
   }
 
-  snprintf(sdp_buf, sizeof(sdp_buf),
-           "v=0\r\n"
-           "o=- 9%ld 1 IN IP4 %s\r\n"
-           "t=0 0\r\n"
-           "a=control:*\r\n"
-           "m=video 0 RTP/AVP 96\r\n"
-           "a=rtpmap:96 H264/90000\r\n"
-           "a=control:track0\r\n",
-           time(NULL), localip.data());
-
+  if (sdp.empty()) {
+    return -1;
+  }
+  // snprintf(sdp_buf, sizeof(sdp_buf),
+  //          "v=0\r\n"
+  //          "o=- 9%ld 1 IN IP4 %s\r\n"
+  //          "t=0 0\r\n"
+  //          "a=control:*\r\n"
+  //          "m=video 0 RTP/AVP 96\r\n"
+  //          "a=rtpmap:96 H264/90000\r\n"
+  //          "a=control:track0\r\n",
+  //          time(NULL), localip.data());
+  LOG(INFO) << "sdp file:\n" << sdp;
   snprintf(response_buf, sizeof(response_buf),
            "RTSP/1.0 200 OK\r\nCSeq: %d\r\n"
            "Content-Base: %s\r\n"
            "Content-type: application/sdp\r\n"
-           "Content-length: %d\r\n\r\n"
+           "Content-length: %lu\r\n\r\n"
            "%s",
-           reponse_seq_, rtsp_url_.data(), static_cast<int>(strlen(sdp_buf)),
-           sdp_buf);
+           reponse_seq_, rtsp_url_.data(), sdp.length(), sdp.c_str());
 
   buffer_writer_.Append(response_buf, strlen(response_buf));
   return 1;

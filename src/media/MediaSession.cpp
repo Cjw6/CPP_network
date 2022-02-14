@@ -9,29 +9,52 @@
 #include <cstdlib>
 #include <cstring>
 
+int MediaSession::kMaxChannels = 2;
 std::atomic<MediaSessionId> MediaSession::IdGen(0);
 
 MediaSession::MediaSession(std::string name)
     : sess_name_(std::string(name)), sess_id_(IdGen.fetch_add(1)),
-      conn_cb_(nullptr), discon_cb_(nullptr), source_(new RtpSourceH264),
-      rtp_packet_buf_(nullptr) {
-  source_->SetSendRtpPacketCb([this](char *data, int len, bool key_frame) {
-    std::lock_guard<std::mutex> lg(session_map_mutex_);
-    // LOG(INFO) << "send rtp packet ...";
-    for (auto &[k, v] : socket_session_map_) {
-      v->SendRtpPacket(data, len, key_frame);
-    }
-  });
+      conn_cb_(nullptr), discon_cb_(nullptr), rtp_packet_buf_(nullptr) {
+  source_vct_.resize(kMaxChannels);
+  for (auto &s : source_vct_) {
+    s = nullptr;
+  }
 }
 
-MediaSession::~MediaSession() { SafeDelete(source_); }
+MediaSession::~MediaSession() {
+  for (auto &source : source_vct_) {
+    SafeDelete(source);
+  }
+}
 
 int MediaSession::UserNum() {
   std::lock_guard<std::mutex> lg(session_map_mutex_);
   return socket_session_map_.size();
 }
 
-void MediaSession::AddRtpSource(RtpSourceH264 *source) {}
+void MediaSession::AddRtpSource(int channel_id, RtpSource *source) {
+  if (!source) {
+    LOG(ERROR) << "add rtp source is null";
+    return;
+  }
+  if (channel_id > kMaxChannels) {
+    LOG(ERROR) << "add rtp source is null";
+    return;
+  }
+
+  if (source_vct_[channel_id]) {
+    delete source_vct_[channel_id];
+  }
+
+  source->SetSendRtpPacketCb([this](char *data, int len, bool key_frame) {
+    std::lock_guard<std::mutex> lg(session_map_mutex_);
+    // LOG(INFO) << "send rtp packet ...";
+    for (auto &[k, v] : socket_session_map_) {
+      v->SendRtpPacket(data, len, key_frame);
+    }
+  });
+  source_vct_[channel_id] = source;
+}
 
 void MediaSession::AddRtpSession(int socket_fd, RtpSessionPtr &rtp) {
   if (conn_cb_) {
@@ -51,13 +74,46 @@ void MediaSession::RemoveRtpSession(int socket_fd) {
   socket_session_map_.erase(iter);
 }
 
-void MediaSession::PushFrame(char *frame, int frame_size, bool key_frame) {
+void MediaSession::PushFrame(int channel_id, char *frame, int frame_size,
+                             bool key_frame) {
+  if (channel_id > kMaxChannels) {
+    return;
+  }
+  if (!source_vct_[channel_id]) {
+    return;
+  }
+
+  auto &source = source_vct_[channel_id];
   if (UserNum()) {
-    // LOG(INFO) << "push frame to send ....";
-    if (source_) {
-      source_->SendFrameByRtpTcp(frame, frame_size, key_frame);
+    source->SendFrameByRtpTcp(frame, frame_size, key_frame);
+  }
+}
+
+std::string MediaSession::GetSDP(std::string ip) {
+  std::string res;
+  char buf[2048] = {0};
+
+  // sdp 头
+  snprintf(buf, sizeof(buf),
+           "v=0\r\n"
+           "o=- 9%ld 1 IN IP4 %s\r\n"
+           "t=0 0\r\n"
+           "a=control:*\r\n",
+           (long)std::time(NULL), ip.c_str());
+
+  for (uint32_t chn = 0; chn < source_vct_.size(); chn++) {
+    if (source_vct_[chn]) {
+      snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "%s\r\n",
+               source_vct_[chn]->GetMediaDescription(0).c_str());
+      snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "%s\r\n",
+               source_vct_[chn]->GetAttribute().c_str());
+
+      snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),
+               "a=control:track%d\r\n", chn);
     }
   }
+  res = buf;
+  return res;
 }
 
 // if (!rtp_packet_buf_) {

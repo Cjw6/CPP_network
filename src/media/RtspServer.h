@@ -11,12 +11,13 @@ public:
   ~RtspServer();
 
   void InitService(ServerConfig &config, Dispatcher::Ptr &disp);
-  
+
   MediaSessionId AddMediaSess(MediaSession::Ptr &media_sess);
   MediaSession::Ptr FindMediaSessionByMediaId(MediaSessionId id);
   MediaSession::Ptr FindMediaSessionByRtspName(std::string &name);
-  
-  void PushFrame(MediaSessionId id,char* frame,int size,bool key_frame);
+
+  void PushFrame(MediaSessionId id, int channel_id, char *frame, int size,
+                 bool key_frame);
 
 protected:
   int SetNewConn(int fd, std::string &ip, int port) override;

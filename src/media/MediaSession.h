@@ -11,6 +11,9 @@
 class RtpSession;
 using RtpSessionPtr = std::shared_ptr<RtpSession>;
 
+#define MEDIA_SESS_CHANNEL_0 0
+#define MEDIA_SESS_CHANNEL_1 1
+
 using MediaSessionId = int;
 
 class MediaSession {
@@ -22,7 +25,7 @@ public:
   MediaSession(std::string sess_name);
   ~MediaSession();
 
-  void AddRtpSource(RtpSourceH264 *source);
+  void AddRtpSource(int channel_id, RtpSource *source);
   void SetNotifConnCb(NotifyConnCb &cb) { conn_cb_ = cb; }
   void SetNotifyDisconCb(NotifyDisconCb &cb) { discon_cb_ = cb; }
 
@@ -33,8 +36,11 @@ public:
 
   void AddRtpSession(int socket_fd, RtpSessionPtr &rtp);
   void RemoveRtpSession(int socket_fd);
-  void PushFrame(char *frame, int size,bool key_frame);
+  void PushFrame(int channel_id, char *frame, int size, bool key_frame);
+  std::string GetSDP(std::string ip);
 
+
+  static int kMaxChannels;
   static std::atomic<MediaSessionId> IdGen;
 
 private:
@@ -44,10 +50,11 @@ private:
   NotifyConnCb conn_cb_;
   NotifyDisconCb discon_cb_;
 
-  RtpSourceH264 *source_;
-  
+  // RtpSourceH264 *source_;
+  std::vector<RtpSource *> source_vct_;
+
   std::mutex session_map_mutex_;
   std::map<int, RtpSessionPtr> socket_session_map_;
-  
+
   char *rtp_packet_buf_;
 };
