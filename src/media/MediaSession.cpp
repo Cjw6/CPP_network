@@ -85,7 +85,7 @@ void MediaSession::PushFrame(int channel_id, char *frame, int frame_size,
 
   auto &source = source_vct_[channel_id];
   if (UserNum()) {
-    source->SendFrameByRtpTcp(frame, frame_size, key_frame);
+    source->SendFrameByRtpTcp(channel_id, frame, frame_size, key_frame);
   }
 }
 

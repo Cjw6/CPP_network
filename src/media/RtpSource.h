@@ -11,7 +11,7 @@ public:
   virtual ~RtpSource();
 
   void SetSendRtpPacketCb(const SendRtpPktCb &cb) { send_cb_ = cb; }
-  virtual void SendFrameByRtpTcp(char *frame, int len, bool key_frame) = 0;
+  virtual void SendFrameByRtpTcp(int channel_id,char *frame, int len, bool key_frame) = 0;
   virtual std::string GetMediaDescription(uint16_t port) = 0;
   virtual std::string GetAttribute() = 0;
 
@@ -24,7 +24,7 @@ public:
   RtpSourceH264();
   ~RtpSourceH264();
 
-  void SendFrameByRtpTcp(char *frame, int len, bool key_frame) override;
+  void SendFrameByRtpTcp(int channel_id,char *frame, int len, bool key_frame) override;
   std::string GetMediaDescription(uint16_t port) override;
   std::string GetAttribute() override;
 
@@ -41,7 +41,7 @@ public:
   RtpSourceAAC(int samplerate, int channels);
   ~RtpSourceAAC();
 
-  void SendFrameByRtpTcp(char *frame, int len, bool key_frame) override;
+  void SendFrameByRtpTcp(int channel_id,char *frame, int len, bool key_frame) override;
   std::string GetMediaDescription(uint16_t port) override;
   std::string GetAttribute() override;
 

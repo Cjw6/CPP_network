@@ -29,6 +29,10 @@ void SigiIntHandler(int sig) {
 
 int main(int argc, char **argv) {
   ::google::ParseCommandLineFlags(&argc, &argv, false);
+  std::string test_url = "live";
+  LOG(INFO) << "test address:  rtsp://" << FLAGS_bind_ip << ":"
+            << FLAGS_bind_port << "/" << test_url;
+
   InitGlog(argv[0], FLAGS_logdir.c_str());
 
   signal(SIGPIPE, SIG_IGN);
@@ -40,7 +44,7 @@ int main(int argc, char **argv) {
   disp->InitLoop(dispatcher_conf);
 
   RtspServer rtsp_serv;
-  MediaSession::Ptr media_session = std::make_shared<MediaSession>("live");
+  MediaSession::Ptr media_session = std::make_shared<MediaSession>(test_url);
   media_session->AddRtpSource(MEDIA_SESS_CHANNEL_0, new RtpSourceH264);
   media_session->AddRtpSource(MEDIA_SESS_CHANNEL_1, new RtpSourceAAC(48000, 2));
   MediaSessionId media_id = rtsp_serv.AddMediaSess(media_session);
@@ -57,7 +61,7 @@ int main(int argc, char **argv) {
 
     ReadH264File r;
     std::string path = "/media/cjw/work1/media/output2.h264";
-    // std::string path = "resource/test.h264";
+    // std::string path = "resource/test2.h264";
     r.Open(path);
     ByteBuffer buffer;
     int index = 0;
@@ -73,7 +77,8 @@ int main(int argc, char **argv) {
       //           << key_frame << " frame_size" << buffer.ReadableSize();
       rtsp_serv.PushFrame(media_id, MEDIA_SESS_CHANNEL_0, buffer.ReadBegin(),
                           buffer.ReadableSize(), key_frame);
-      int interval_us = 1000 * 1000 / 25 - static_cast<int>(tc.duration_us());
+      int interval_us =
+          1000 * 1000 / 25 - static_cast<int>(tc.duration_us()) - 2000;
       // LOG(INFO) << "capture interval:" << interval_us;
       EC_SleepUs(interval_us);
       tc.restart();

@@ -45,7 +45,7 @@ bool RtpSourceH264::IsKeyFrame(char *data, int size) {
 }
 
 RtpSourceH264::RtpSourceH264()
-    : rtp_packet_buf_(nullptr), time_stamp_(0), seq_(0) {}
+    : rtp_packet_buf_(nullptr), time_stamp_(90000 * 0.005), seq_(0) {}
 
 RtpSourceH264::~RtpSourceH264() {}
 
@@ -59,8 +59,13 @@ std::string RtpSourceH264::GetAttribute() {
   return std::string("a=rtpmap:96 H264/90000");
 }
 
-void RtpSourceH264::SendFrameByRtpTcp(char *frame, int frame_len,
-                                      bool keyframe) {
+void RtpSourceH264::SendFrameByRtpTcp(int channel_id, char *frame,
+                                      int frame_len, bool keyframe) {
+  // auto time_point = std::chrono::time_point_cast<std::chrono::microseconds>(
+  //     std::chrono::steady_clock::now());
+  // time_stamp_ =
+  //     (uint32_t)((time_point.time_since_epoch().count() + 500) / 1000 * 90);
+
   if (!rtp_packet_buf_) {
     rtp_packet_buf_ = (char *)malloc(RTP_PACKET_MALLOC_SIZE);
     rtpHeaderInit((RtpPacketTcp *)rtp_packet_buf_, 0, 0, 0, RTP_VESION,
@@ -68,7 +73,7 @@ void RtpSourceH264::SendFrameByRtpTcp(char *frame, int frame_len,
   } else {
     memset(rtp_packet_buf_ + RTP_HEADER_SIZE + 4, 0, RTP_MAX_PKT_SIZE);
   }
-  LOG(INFO)<<"send h264 rtp packet;";
+  // LOG(INFO)<<"send h264 rtp packet;";
   RtpPacketTcp *rtp_packet_tcp = (RtpPacketTcp *)rtp_packet_buf_;
 
   char naluType = frame[0];
@@ -84,7 +89,7 @@ void RtpSourceH264::SendFrameByRtpTcp(char *frame, int frame_len,
     memcpy(rtp_packet_tcp->payload, frame, frame_len);
     int packet_size = frame_len + RTP_HEADER_SIZE;
     rtp_packet_tcp->header[0] = '$';
-    rtp_packet_tcp->header[1] = 0;
+    rtp_packet_tcp->header[1] = 2 * channel_id;
     rtp_packet_tcp->header[2] = (packet_size & 0xFF00) >> 8;
     rtp_packet_tcp->header[3] = (packet_size)&0xFF;
     rtp_packet_tcp->rtpHeader.timestamp = htonl(time_stamp_);
@@ -150,6 +155,8 @@ void RtpSourceH264::SendFrameByRtpTcp(char *frame, int frame_len,
   }
 
   time_stamp_ += 90000 / 25;
+
+  // LOG(INFO) << time_stamp_;
 }
 
 uint32_t RtpSourceAAC::AACSampleRate[16] = {
@@ -159,7 +166,7 @@ uint32_t RtpSourceAAC::AACSampleRate[16] = {
 
 RtpSourceAAC::RtpSourceAAC(int samplerate, int channels)
     : rtp_packet_buf_(nullptr), samplerate_(samplerate), channels_(channels),
-      time_stamp_(0), seq_(0) {}
+      time_stamp_(500), seq_(0) {}
 
 RtpSourceAAC::~RtpSourceAAC() {}
 
@@ -199,8 +206,13 @@ std::string RtpSourceAAC::GetAttribute() {
   return std::string(buf);
 }
 
-void RtpSourceAAC::SendFrameByRtpTcp(char *frame, int frame_len,
+void RtpSourceAAC::SendFrameByRtpTcp(int channel_id, char *frame, int frame_len,
                                      bool key_frame) {
+  // auto time_point = std::chrono::time_point_cast<std::chrono::microseconds>(
+  //     std::chrono::steady_clock::now());
+  // time_stamp_ = (uint32_t)((time_point.time_since_epoch().count() + 500) /
+  //                          1000 * 48000 / 1000);
+
   if (!rtp_packet_buf_) {
     rtp_packet_buf_ = (char *)malloc(5 * 1024);
     // rtpHeaderInit((RtpPacketTcp *)rtp_packet_buf_, 0, 0, 0, RTP_VESION,
@@ -210,7 +222,7 @@ void RtpSourceAAC::SendFrameByRtpTcp(char *frame, int frame_len,
   } else {
     memset(rtp_packet_buf_ + RTP_HEADER_SIZE + 4, 0, RTP_MAX_PKT_SIZE);
   }
-  LOG(INFO)<<"send aac rtp packet;";
+  // LOG(INFO)<<"send aac rtp packet;";
   RtpPacketTcp *rtp_packet_tcp = (RtpPacketTcp *)rtp_packet_buf_;
 
   // char naluType = frame[0];
@@ -233,7 +245,7 @@ void RtpSourceAAC::SendFrameByRtpTcp(char *frame, int frame_len,
   int packet_size = frame_len + RTP_HEADER_SIZE + 4;
 
   rtp_packet_tcp->header[0] = '$';
-  rtp_packet_tcp->header[1] = 2;
+  rtp_packet_tcp->header[1] = 2 * channel_id;
   rtp_packet_tcp->header[2] = (packet_size & 0xFF00) >> 8;
   rtp_packet_tcp->header[3] = (packet_size)&0xFF;
   rtp_packet_tcp->rtpHeader.timestamp = htonl(time_stamp_);
@@ -243,6 +255,7 @@ void RtpSourceAAC::SendFrameByRtpTcp(char *frame, int frame_len,
     send_cb_(rtp_packet_buf_, packet_size + 4, key_frame);
   }
   time_stamp_ += 1025;
+
   seq_++;
   // }
 }
