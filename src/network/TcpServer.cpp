@@ -14,7 +14,7 @@
 
 TcpServer::TcpServer()
     : conn_gen_id_(0), new_conn_cb_(nullptr), read_cb_(nullptr),
-      error_cb_(nullptr) {}
+      error_cb_(nullptr){}
 
 TcpServer::~TcpServer() {}
 
@@ -29,24 +29,42 @@ void TcpServer::SetErrorCb(TcpConnect::ErrorCb cb) {
 }
 
 int TcpServer::InitServer(ServerConfig &conf, Dispatcher::Ptr &disp) {
-  conf_ = conf;
+  SetConfigParams(conf);
   dispatcher_ = disp;
 
-  acceptor_ = std::make_unique<Acceptor>(dispatcher_, conf.ip_, conf.port,
-                                         conf.max_listen);
+  acceptor_ = std::make_unique<Acceptor>(dispatcher_, conf_.ip_, conf_.port,
+                                         conf_.max_listen);
   if (acceptor_->Listen() < 0) {
     return -1;
   }
   acceptor_->SetNewConnCb(
       [&](int fd, std::string ip, int port) { SetNewConn(fd, ip, port); });
 
-  conn_mgr_ = std::make_unique<ConnectManager>();
-
+  conn_mgr_ = std::make_unique<TcpConnectManager>();
   return 1;
 }
 
 void TcpServer::RemoveSocketByName(const std::string &name) {
   conn_mgr_->RemoveConnectToManager(name);
+}
+
+void TcpServer::SetConfigParams(ServerConfig &conf) {
+  if (conf.ip_.empty()) {
+    conf.ip_ = "0.0.0.0";
+  }
+  if (conf.port <= 0) {
+    conf.port = 12300;
+  }
+  if (conf.max_listen == 0) {
+    conf.max_listen = 1000;
+  }
+  if (conf.max_epoll_num) {
+    conf.max_epoll_num = 1024;
+  }
+  if (conf.tcp_keep_alive_ms == 0) {
+    conf.tcp_keep_alive_ms = 1000 * 30;
+  }
+  conf_ = conf;
 }
 
 int TcpServer::SetNewConn(int fd, std::string &ip, int port) {

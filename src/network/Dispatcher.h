@@ -1,17 +1,18 @@
 #pragma once
 
-#include "TimerController.h"
-#include "util/Thread.h"
-#include "util/ThreadPool.h"
+// #include "TimerController.h"
+#include "util/ThreadPoolWrap.h"
+#include <sched.h>
+#include <sys/epoll.h>
+
+#include <cstdint>
 
 #include <atomic>
 #include <deque>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
-#include <sched.h>
-#include <stdint.h>
-#include <sys/epoll.h>
 #include <vector>
 
 // enum EventOption;
@@ -44,20 +45,17 @@ public:
   void ModifyEvent(int fd, int state);
   void UpdateChannels(Channels *pc, int fd, uint32_t option, uint32_t events);
 
-  //从其他的线程添加任务。。。
   void RunTask(const TaskCb &task, bool use_threadpool = false);
-  TimerTask::Id AddTimerTask(TimerTask::Func func, TimeUs delay,
-                             bool singleshot = true);
-  void RemoveTimerTask(TimerTask::Id &id);
   void Wake();
 
   const WorkMode &GetWorkMode() { return work_mode_; }
 
 private:
+  enum UpdateRegisterTaskState { TaskAdd = 0, TaskRemove, TaskUnkonow };
+
   void ChannelHandelEvent(int n);
   void HandlelAsyncQueue();
 
-  std::thread run_thread_;
   WorkMode work_mode_;
 
   int epoll_fd_;
@@ -65,16 +63,14 @@ private:
   std::vector<epoll_event> epoll_lists_;
 
   //回调任务
-  std::mutex exec_queue_mutex_;
   std::deque<TaskCb> task_exec_queue_;
-  std::deque<TaskCb> task_wait_queue_;
+  std::mutex exec_queue_mutex_;
 
   pid_t thread_id_;
   std::atomic<int> running_flag_;
 
-  std::unique_ptr<ThreadPool> pool_;
+  thrdpool_t *thread_pool_;
   int thread_num_;
 
-  std::unique_ptr<TimerController> timer_ctl_;
   std::unique_ptr<WakeChannel> wake_;
 };

@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 
 int main(int argc, char **argv) {
+  #if 0
   LOG(INFO) << "start";
   Dispatcher::Ptr disp = std::make_shared<Dispatcher>();
   Dispatcher::Config conf;
@@ -45,5 +46,6 @@ int main(int argc, char **argv) {
 
   disp->Dispatch();
   t1.join();
+  #endif
   return 0;
 }

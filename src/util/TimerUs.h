@@ -29,6 +29,8 @@ private:
 bool operator>(const TimeUs &l, const TimeUs &r);
 bool operator<(const TimeUs &l, const TimeUs &r);
 
-void EC_SleepUs(int us);
-void EC_SleepMs(int ms);
-void EC_Sleep(int sec);
+namespace Cj {
+void SleepUs(int us);
+void SleepMs(int ms);
+void Sleep(int sec);
+} // namespace Cj

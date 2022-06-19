@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
   conf.ip_ = FLAGS_bind_ip;
   conf.port = FLAGS_bind_port;
   conf.max_listen = 1024;
+  conf.tcp_keep_alive_ms = -1;
   LOG(INFO) << "rtsp server bind ip " << conf.ip_ << "   port: " << conf.port;
   rtsp_serv.InitService(conf, disp);
 
@@ -80,7 +81,8 @@ int main(int argc, char **argv) {
       int interval_us =
           1000 * 1000 / 25 - static_cast<int>(tc.duration_us()) - 2000;
       // LOG(INFO) << "capture interval:" << interval_us;
-      EC_SleepUs(interval_us);
+      Cj::SleepUs(interval_us);
+      // EC_SleepUs(interval_us);
       tc.restart();
     }
   });
@@ -116,7 +118,8 @@ int main(int argc, char **argv) {
       int interval_us =
           1000 * 1000 / (48000 / 1024) - static_cast<int>(tc.duration_us());
       // LOG(INFO) << "capture interval:" << interval_us;
-      EC_SleepUs(interval_us);
+      // EC_SleepUs(interval_us);
+      Cj::SleepUs(interval_us);
       tc.restart();
     }
   });

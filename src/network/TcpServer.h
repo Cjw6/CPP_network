@@ -16,6 +16,7 @@ struct ServerConfig {
   int port;
   int max_listen;
   int max_epoll_num;
+  int tcp_keep_alive_ms;
 };
 
 class TcpServer {
@@ -31,6 +32,7 @@ public:
   void SetErrorCb(TcpConnect::ErrorCb cb);
 
 protected:
+  void SetConfigParams(ServerConfig &conf);
   virtual int SetNewConn(int fd, std::string &ip, int port);
 
   ServerConfig conf_;
@@ -41,7 +43,9 @@ protected:
   TcpConnect::ReadCb read_cb_;
   TcpConnect::ErrorCb error_cb_;
 
-  std::unique_ptr<ConnectManager> conn_mgr_;
+  std::unique_ptr<TcpConnectManager> conn_mgr_;
+
+  uint32_t register_tcpcheck_id_;
 
   int conn_gen_id_;
 };

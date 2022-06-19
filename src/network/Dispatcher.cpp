@@ -3,7 +3,7 @@
 #include "network/WakeUp.h"
 
 #include "util/Thread.h"
-#include "util/ThreadPool.h"
+#include "util/ThreadPoolWrap.h"
 
 #include "util/Log.h"
 
@@ -11,6 +11,8 @@
 #include <memory>
 #include <mutex>
 #include <sys/epoll.h>
+
+constexpr int kDefaultThreadStackSize=4*1024;
 
 static constexpr unsigned int str2int(const char *str, int h = 0) {
   return !str[h] ? 5381 : (str2int(str, h + 1) * 33) ^ str[h];
@@ -20,7 +22,7 @@ Dispatcher::Config::Config() : thread_num(1), epoll_max_listen(1000) {}
 
 Dispatcher::Dispatcher()
     : epoll_fd_(-1), thread_id_(-1), running_flag_(0), thread_num_(0),
-      epoll_max_listen_num_(0) {}
+      epoll_max_listen_num_(0),thread_pool_(nullptr) {}
 
 Dispatcher::~Dispatcher() {}
 
@@ -36,7 +38,7 @@ bool Dispatcher::InitLoop(Config &conf) {
     LOG(INFO) << "cur work mode: ST";
   } else {
     work_mode_ = kMTMode;
-    pool_ = std::make_unique<ThreadPool>(thread_num_);
+    thread_pool_=thrdpool_create(thread_num_, kDefaultThreadStackSize);
     LOG(INFO) << "cur work mode MT";
   }
 
@@ -47,8 +49,7 @@ bool Dispatcher::InitLoop(Config &conf) {
     return false;
   }
 
-  auto self = shared_from_this();
-  timer_ctl_ = std::make_unique<TimerController>();
+  auto self=shared_from_this();
   wake_ = std::make_unique<WakeChannel>(self);
   if (wake_->InitEventFd() < 0) {
     return false;
@@ -58,27 +59,16 @@ bool Dispatcher::InitLoop(Config &conf) {
 
 void Dispatcher::Dispatch() {
   thread_id_ = GetThreadId();
-  {
-    std::lock_guard<std::mutex> lg(exec_queue_mutex_);
-    for (auto &task : task_exec_queue_) {
-      task();
-    }
-    task_exec_queue_.clear();
-    for (auto &task : task_wait_queue_) {
-      task();
-    }
-    task_wait_queue_.clear();
-  }
-
   running_flag_ = 1;
-  int interval = timer_ctl_->CalIntervalMs();
-  LOG(INFO) << "fisrt interval " << interval;
+  // int interval = timer_ctl_->CalIntervalMs();
+  // LOG(INFO) << "fisrt interval " << interval;
   int event_count = 0;
   int64_t loop_cnt = 0;
-  // LOG(INFO) << running_flag_.load();
+
+  HandlelAsyncQueue();
   while (running_flag_) {
     event_count =
-        epoll_wait(epoll_fd_, &epoll_lists_[0], epoll_lists_.size(), interval);
+        epoll_wait(epoll_fd_, &epoll_lists_[0], epoll_lists_.size(), -1);
 
     if (event_count < 0) {
       PLOG(ERROR) << "epoll wait:";
@@ -89,54 +79,26 @@ void Dispatcher::Dispatch() {
         return;
       }
     }
-
-    timer_ctl_->Schedule();
-    HandlelAsyncQueue();
     ChannelHandelEvent(event_count);
-
-    interval = timer_ctl_->CalIntervalMs();
-    if (interval < 0) {
-      interval = 13;
-    } else {
-      interval = std::min(interval, 13);
-    }
-
+    HandlelAsyncQueue();
     loop_cnt++;
-    // LOG(INFO) << "print loop_cnt" << loop_cnt << " interval" << interval;
   }
   LOG(INFO) << "quit";
 }
 
 void Dispatcher::RunTask(const TaskCb &task, bool use_threadpool) {
   if (work_mode_ == kMTMode && use_threadpool) {
-    pool_->enqueue(std::move(task));
+    // pool_->enqueue(std::move(task));
+    Cj::AddTaskToThreadPool(thread_pool_,task);
   } else if (thread_id_ == GetThreadId()) {
     task();
   } else {
     {
       std::lock_guard<std::mutex> lg(exec_queue_mutex_);
-      task_wait_queue_.emplace_back(std::move(task));
+      task_exec_queue_.emplace_back(std::move(task));
     }
     wake_->WakeUp();
   }
-}
-
-TimerTask::Id Dispatcher::AddTimerTask(TimerTask::Func func, TimeUs delay,
-                                       bool singleshot) {
-  if (!timer_ctl_) {
-    return -1;
-  }
-
-  return timer_ctl_->AddTask(std::move(func), delay, singleshot);
-}
-
-void Dispatcher::RemoveTimerTask(TimerTask::Id &id) {
-  if (!timer_ctl_) {
-    id = -1;
-    return;
-  }
-
-  timer_ctl_->RemoveTimerTask(id);
 }
 
 void Dispatcher::Wake() {
@@ -192,14 +154,15 @@ void Dispatcher::ChannelHandelEvent(int n) {
 }
 
 void Dispatcher::HandlelAsyncQueue() {
+  decltype(task_exec_queue_) task_queue_tmp;
+
   exec_queue_mutex_.lock();
-  if (task_wait_queue_.size())
-    std::swap(task_exec_queue_, task_wait_queue_);
+  if (task_exec_queue_.size()) {
+    task_queue_tmp.swap(task_exec_queue_);
+  }
   exec_queue_mutex_.unlock();
 
-  // LOG(INFO) << " async task queue size " << task_exec_queue_.size();
-  for (auto &task : task_exec_queue_) {
+  for (auto &task : task_queue_tmp) {
     task();
   }
-  task_exec_queue_.clear();
 }

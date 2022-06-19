@@ -43,12 +43,18 @@ bool operator<(const TimeUs &l, const TimeUs &r) {
   return l.GetTimeUs() < r.GetTimeUs();
 }
 
-void EC_SleepUs(int us) {
+namespace Cj {
+
+void SleepUs(int us) {
   std::this_thread::sleep_for(std::chrono::microseconds(us));
 }
 
-void EC_SleepMs(int ms) {
+void SleepMs(int ms) {
   std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
-void EC_Sleep(int sec) { std::this_thread::sleep_for(std::chrono::seconds(sec)); }
+void Sleep(int sec) {
+  std::this_thread::sleep_for(std::chrono::seconds(sec));
+}
+
+} // namespace Cj

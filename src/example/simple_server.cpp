@@ -18,7 +18,7 @@
 #include "util/StringSplit.h"
 
 DEFINE_string(logdir, "./log", "日志文件夹路径");
-DEFINE_int32(thread_num, 1, "调度器的线程使用数");
+DEFINE_int32(thread_num, 7, "调度器的线程使用数");
 DEFINE_string(bind_ip, "0.0.0.0", "绑定ip");
 DEFINE_int32(bind_port, 8888, "绑定ip");
 
@@ -76,6 +76,7 @@ int main(int argc, char **argv) {
   conf.ip_ = FLAGS_bind_ip;
   conf.port = FLAGS_bind_port;
   conf.max_listen = 1024;
+  conf.tcp_keep_alive_ms = -1;
   LOG(INFO) << "server bind ip " << conf.ip_ << "   port: " << conf.port;
   serv.InitServer(conf, disp);
 

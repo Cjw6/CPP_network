@@ -30,6 +30,6 @@
     "--header-insertion=never",
     "--query-driver=/usr/bin/g++"
   ],
-  "C_Cpp.intelliSenseEngine":"Disabled",
+  // "C_Cpp.intelliSenseEngine":"Disabled",
   "C_Cpp.default.compileCommands": "build"
 }

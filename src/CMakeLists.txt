@@ -14,7 +14,10 @@ util/SafeQueue.h
 util/Singleton.h
 util/Thread.cpp
 util/Thread.h
-util/ThreadPool.h
+util/thrdpool.c
+util/thrdpool.h
+util/ThreadPoolWrap.h
+util/list.h
 util/TimeCost.h
 util/StringSplit.cpp
 util/ByteBuffer.h
@@ -25,6 +28,9 @@ util/Adler32.cpp
 util/Adler32.h
 util/File.h
 util/File.cpp
+util/Skiplist.h
+util/Skiplist.cpp
+util/thrdpool.c
 )
 target_link_libraries(easycpp_util glog gflags pthread)
 
@@ -62,8 +68,6 @@ network/TcpConnect.cpp
 network/TcpConnect.h
 network/TcpServer.cpp
 network/TcpServer.h
-network/TimerController.cpp
-network/TimerController.h
 network/WakeUp.cpp
 network/WakeUp.h
 )
