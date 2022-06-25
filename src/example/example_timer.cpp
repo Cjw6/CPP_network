@@ -4,48 +4,40 @@
 
 #include <glog/logging.h>
 
+int g_i = 0;
+
+class A {
+public:
+  A() { LOG(INFO) << "A"; }
+  ~A() { LOG(INFO) << "~A"; }
+  void Print() { LOG(INFO) << "print a"; }
+};
+
+thread_local A g_a;
+
 int main(int argc, char **argv) {
-  #if 0
+  using namespace std::chrono_literals;
   LOG(INFO) << "start";
   Dispatcher::Ptr disp = std::make_shared<Dispatcher>();
   Dispatcher::Config conf;
-  disp->InitLoop(conf);
+  conf.thread_num = 8;
+  disp->Init(conf);
 
-  disp->AddTimerTask(
-      []() {
-        LOG(INFO) << "timer1";
-        return 1;
-      },
-      1 * 1000 * 1000);
+  std::thread th([&] { g_a.Print(); });
+  th.detach();
 
-  int cnt = 3;
-  TimerTask::Id timer_id = disp->AddTimerTask(
-      [&]() {
-        LOG(INFO) << "timer2  " << cnt;
-        if (cnt == 0) {
-          return -1;
-        }
-        cnt--;
-        return 1;
-      },
-      2 * 1000 * 1000, false);
+  disp->timer_mgr_.AddFuncAfterDuration(Cj::TM_WM_Local, Cj::DurationMs(100),
+                                        []() {
+                                          LOG(INFO) << "timer1";
+                                          return 1;
+                                        });
 
-  int cnt2 = 0;
-  TimerTask::Id timer_id2 = disp->AddTimerTask(
-      [&]() {
-        LOG(INFO) << "timer3  " << cnt2;
-        cnt2++;
-        return 1;
-      },
-      2 * 1000 * 1000, false);
+  disp->timer_mgr_.AddRepeatedFunc(Cj::TM_WM_Local, Cj::DurationMs(1000), 5,
+                                   [&]() { LOG(INFO) << g_i++; });
 
-  std::thread t1([&]() {
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-    disp->RunTask([&] { disp->RemoveTimerTask(timer_id2); });
-  });
+  disp->timer_mgr_.AddRepeatedFunc(Cj::TM_WM_ThrPool, Cj::DurationMs(2000), -1,
+                                   []() { LOG(INFO) << __func__; });
 
   disp->Dispatch();
-  t1.join();
-  #endif
   return 0;
 }

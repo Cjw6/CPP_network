@@ -24,6 +24,7 @@ util/ByteBuffer.h
 util/ByteBuffer.cpp
 util/TimerUs.cpp
 util/TimerUs.h
+util/TimerThread.h
 util/Adler32.cpp
 util/Adler32.h
 util/File.h

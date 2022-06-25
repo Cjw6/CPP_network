@@ -12,7 +12,7 @@
 #include <mutex>
 #include <sys/epoll.h>
 
-constexpr int kDefaultThreadStackSize=4*1024;
+constexpr int kDefaultThreadStackSize = 4 * 1024;
 
 static constexpr unsigned int str2int(const char *str, int h = 0) {
   return !str[h] ? 5381 : (str2int(str, h + 1) * 33) ^ str[h];
@@ -22,11 +22,11 @@ Dispatcher::Config::Config() : thread_num(1), epoll_max_listen(1000) {}
 
 Dispatcher::Dispatcher()
     : epoll_fd_(-1), thread_id_(-1), running_flag_(0), thread_num_(0),
-      epoll_max_listen_num_(0),thread_pool_(nullptr) {}
+      epoll_max_listen_num_(0), thread_pool_(nullptr) {}
 
 Dispatcher::~Dispatcher() {}
 
-bool Dispatcher::InitLoop(Config &conf) {
+bool Dispatcher::Init(Config &conf) {
   thread_num_ = conf.thread_num;
   epoll_max_listen_num_ = conf.epoll_max_listen;
 
@@ -38,7 +38,8 @@ bool Dispatcher::InitLoop(Config &conf) {
     LOG(INFO) << "cur work mode: ST";
   } else {
     work_mode_ = kMTMode;
-    thread_pool_=thrdpool_create(thread_num_, kDefaultThreadStackSize);
+    thread_pool_ = thrdpool_create(thread_num_, kDefaultThreadStackSize);
+    timer_mgr_.SetPool(thread_pool_);
     LOG(INFO) << "cur work mode MT";
   }
 
@@ -49,7 +50,7 @@ bool Dispatcher::InitLoop(Config &conf) {
     return false;
   }
 
-  auto self=shared_from_this();
+  auto self = shared_from_this();
   wake_ = std::make_unique<WakeChannel>(self);
   if (wake_->InitEventFd() < 0) {
     return false;
@@ -66,6 +67,7 @@ void Dispatcher::Dispatch() {
   int64_t loop_cnt = 0;
 
   HandlelAsyncQueue();
+  timer_mgr_.Run();
   while (running_flag_) {
     event_count =
         epoll_wait(epoll_fd_, &epoll_lists_[0], epoll_lists_.size(), -1);
@@ -89,7 +91,7 @@ void Dispatcher::Dispatch() {
 void Dispatcher::RunTask(const TaskCb &task, bool use_threadpool) {
   if (work_mode_ == kMTMode && use_threadpool) {
     // pool_->enqueue(std::move(task));
-    Cj::AddTaskToThreadPool(thread_pool_,task);
+    Cj::AddTaskToThreadPool(thread_pool_, task);
   } else if (thread_id_ == GetThreadId()) {
     task();
   } else {

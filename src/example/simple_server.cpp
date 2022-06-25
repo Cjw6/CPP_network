@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
   Dispatcher::Config dispatcher_conf;
   dispatcher_conf.thread_num = FLAGS_thread_num;
   Dispatcher::Ptr disp = std::make_shared<Dispatcher>();
-  disp->InitLoop(dispatcher_conf);
+  disp->Init(dispatcher_conf);
 
   TcpServer serv;
   serv.SetNewConnCb([](int fd, std::string ip, int port) {

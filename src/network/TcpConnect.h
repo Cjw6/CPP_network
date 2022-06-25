@@ -38,7 +38,6 @@ public:
   void Send(const SendBufBlock::Ptr &buf);
 
   void SetReadCb(ReadCb cb) { read_cb_ = std::move(cb); }
-  // void SetWriteCb(WriteCb cb) { write_cb_ = cb; }
   void SetErrorCb(ErrorCb cb) { error_cb_ = std::move(cb); }
 
   const std::string &GetName() { return name_; }

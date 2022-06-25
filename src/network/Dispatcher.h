@@ -1,7 +1,7 @@
 #pragma once
 
 // #include "TimerController.h"
-#include "util/ThreadPoolWrap.h"
+
 #include <sched.h>
 #include <sys/epoll.h>
 
@@ -15,6 +15,8 @@
 #include <mutex>
 #include <vector>
 
+#include "util/ThreadPoolWrap.h"
+#include "util/TimerThread.h"
 // enum EventOption;
 class Channels;
 class TimerController;
@@ -37,7 +39,7 @@ public:
   ~Dispatcher();
 
   void Dispatch();
-  bool InitLoop(Config &config);
+  bool Init(Config &config);
 
   //事件更改
   void AddEvent(int fd, int state);
@@ -47,9 +49,9 @@ public:
 
   void RunTask(const TaskCb &task, bool use_threadpool = false);
   void Wake();
-
   const WorkMode &GetWorkMode() { return work_mode_; }
-
+  Cj::TimerQueueThread timer_mgr_;
+  
 private:
   enum UpdateRegisterTaskState { TaskAdd = 0, TaskRemove, TaskUnkonow };
 
@@ -57,7 +59,6 @@ private:
   void HandlelAsyncQueue();
 
   WorkMode work_mode_;
-
   int epoll_fd_;
   int epoll_max_listen_num_;
   std::vector<epoll_event> epoll_lists_;
@@ -73,4 +74,5 @@ private:
   int thread_num_;
 
   std::unique_ptr<WakeChannel> wake_;
+  
 };

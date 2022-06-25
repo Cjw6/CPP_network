@@ -1,6 +1,7 @@
 #ifndef THREADPOOL_CPP_WARP_H
 #define THREADPOOL_CPP_WARP_H
 
+#include <cassert>
 #include <cstdio>
 #include <functional>
 #include <iterator>
@@ -19,6 +20,10 @@ public:
 
 inline void ThreadTaskRun(void *p) {
   ThreadPoolTask *th_task = reinterpret_cast<ThreadPoolTask *>(p);
+  
+  assert(th_task);//<<"hreadPoolTask * is null";
+  assert(th_task->cb_);//<<"th_task->cb_ is null";
+  
   th_task->cb_();
   delete th_task;
 }

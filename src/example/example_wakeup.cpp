@@ -2,12 +2,13 @@
 #include "util/Log.h"
 
 #include <chrono>
+#include <thread>
 
 int main(int argc, char **argv) {
   LOG(INFO) << "start";
   Dispatcher::Ptr disp = std::make_shared<Dispatcher>();
   Dispatcher::Config conf;
-  disp->InitLoop(conf);
+  disp->Init(conf);
 
   std::thread t1([&]() {
     std::this_thread::sleep_for(std::chrono::seconds(1));
