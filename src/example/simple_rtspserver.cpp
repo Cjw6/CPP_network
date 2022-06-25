@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
   Dispatcher::Config dispatcher_conf;
   dispatcher_conf.thread_num = FLAGS_thread_num;
   Dispatcher::Ptr disp = std::make_shared<Dispatcher>();
-  disp->InitLoop(dispatcher_conf);
+  disp->Init(dispatcher_conf);
 
   RtspServer rtsp_serv;
   MediaSession::Ptr media_session = std::make_shared<MediaSession>(test_url);
@@ -129,3 +129,7 @@ int main(int argc, char **argv) {
   push_audio_thread.join();
   return 0;
 }
+
+// 播放地址 ffplay   -rtsp_transport tcp  rtsp://127.0.0.1:8888/live  测试通过
+// FIXME：vlc   rtsp://127.0.0.1:8888/live  --rtsp-tcp  -vv  测试未通过 
+
